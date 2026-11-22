@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>点メモ花火｜部品ピッキング間違い</title>
+<style>
+:root{color-scheme:light;--paper:#eae6da;--ink:#172c38;--muted:#435964;--line:#c5bdac}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);margin:0;font:15px/1.65 system-ui,sans-serif}
+main{max-width:1160px;margin:auto;padding:22px clamp(12px,4vw,42px)}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+h1{font:700 clamp(29px,4vw,42px)/1.3 "Yu Mincho","Noto Serif CJK JP",serif;margin:0;letter-spacing:.05em}
+a{color:#405961;text-underline-offset:.23em}
+.controls{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:9px}
+button{background:#f7f2e6;border:1px solid #c6c3b9;color:inherit;border-radius:3px;padding:5px 10px;font:inherit;cursor:pointer}
+button:disabled{opacity:.4;cursor:default}
+input{accent-color:#47646a;flex:1;min-width:80px}
+output{font-variant-numeric:tabular-nums;min-width:47px;text-align:center}
+.board{background:#fbf7eb;border:1px solid var(--line);border-radius:2px;overflow:auto;max-width:100%}
+svg{display:block;width:100%;min-width:665px;height:auto;font-family:"Yu Mincho","Noto Serif CJK JP",serif}
+.point,.island-label,.trace{cursor:pointer;outline:none}
+.point:focus .ring,.point.active .ring{stroke-width:2;opacity:1}
+.point:hover text,.point:focus text,.island-label:focus text,.island-label:hover text{text-decoration:underline}
+.trace:focus .ink,.trace:hover .ink{stroke-width:2.9}
+.ghost{opacity:.22}
+.legend{min-height:85px;margin-top:10px;padding:10px 13px;background:#f7f2e5;border-left:3px solid #a34b39}
+details{margin:12px 0;color:var(--muted)}
+summary{cursor:pointer}
+.legend strong{margin-right:.75em}
+.legend small{display:block;color:var(--muted);font-size:13px}
+@media(max-width:700px){main{padding-top:14px}.controls{font-size:13px}}
+</style>
+<main>
+<header><h1>点メモ花火</h1><span>部品ピッキング間違い · 調査の流れの試作</span></header>
+<div class="controls">
+<button id="start">最初から</button><button id="back" aria-label="一つ戻る">‹</button>
+<input id="progress" type="range" min="0" value="0" aria-label="描いた順">
+<button id="next" aria-label="一つ進む">›</button><output id="count"></output><button id="all">全体を見る</button>
+</div>
+<div class="board"><svg id="map" viewBox="0 0 1000 570" aria-label="ピッキング間違いの調査の流れと点メモ花火"></svg></div>
+<div class="legend" id="detail" aria-live="polite"></div>
+<details><summary>題材にした調査メモを読む</summary><ol id="dialogue"></ol></details>
+</main>
+<script>
+const source_text = {
+  title:"部品ピッキング間違い",
+  note:"以前うかがった事象をもとに、調査の問いを置く順を試作した。実際の発言や調査順の記録ではない。",
+  dialogue:[
+    ["対象","機種B向け。製品名と工場名は資料にない。"],
+    ["取り違え","取るべき部品と外観が似た別の部品を取った。具体的な品番は資料にない。"],
+    ["場所","部品倉庫のA棚。共通部品はA棚に集約されていた。"],
+    ["作業の前後","機種Bの担当者が、共通部品を取りにA棚へ行った。取り違えた瞬間に何を見たかは未確認。"],
+    ["確認すること","箱・袋・仕切り箱には品番表示があった。取る直前に、どの表示を見て、何と照合したかを確かめたい。"]
+  ]
+};
+
+const topics = [
+  {x:376,y:181,title:"何の製品、どの工場？",refs:["c1","unknown"],ink:"#546778",spoke:"M444 215Q418 204 380 180",path:"M375 166Q337 144 375 120"},
+  {x:643,y:204,title:"何を間違った？",refs:["a2"],ink:"#9b4637",spoke:"M595 229Q617 215 639 201",path:"M662 192Q682 174 712 165"},
+  {x:655,y:273,title:"どこで間違った？",refs:["a1"],ink:"#9b4637",spoke:"M616 268Q633 265 650 268",path:"M669 282Q676 300 706 300"},
+  {x:413,y:359,title:"どうして間違った？",refs:["c3","c4","c5"],ink:"#22685d",spoke:"M466 317Q442 332 417 351",path:"M433 368Q440 390 474 406"},
+  {x:293,y:264,title:"何を確認？",refs:["b1","b2","b3","check"],ink:"#365b73",spoke:"M397 270Q342 287 296 263",path:"M281 257Q257 256 233 255"}
+];
+
+const points = [
+  ["c1",372,91,"機種B向け","#526273","担当機種はここで押さえる。製品名と工場名は資料にない。",0,18],
+  ["unknown",372,119,"製品名・工場名 … 未確認","#717877","資料に記載がない。調査では製造記録などに戻って確認する項目。",0,15],
+  ["a2",715,153,"外観の似た別部品","#9b4637","部品名を並べる手前で、見た目の近さが気になった。",1,23],
+  ["a1",716,300,"部品倉庫のA棚","#9b4637","対象はBなのに、取り違えた場所はA棚。このずれが目に留まった。",2,19],
+  ["c3",479,417,"共通部品だけ","#a74f35","A棚に集約されていたのは共通部品。『だけ』に、ほかの部品との取り方の差が現れる。",3,22],
+  ["c4",718,356,"A棚に取りに行く","#22685d","同じA棚が、間違いの起きた場所と、B担当者の行き先に重なる。",3,19],
+  ["c5",313,486,"機種Bの担当者","#22685d","A棚の中だけを見ていた目が、そこへ取りに来た人に戻った。",3,20],
+  ["b1",94,165,"箱には品番","#365b73","表示がすでにあることが、何を確認するかを変える。",4,20],
+  ["b2",125,204,"袋にも","#365b73","箱だけでなく袋でも、品番が確かめられる。",4,17],
+  ["b3",142,238,"仕切り箱にも","#365b73","表示がある場所は三つ。手を伸ばした時点では、どれを見たのか。",4,17],
+  ["check",90,332,"手を伸ばす直前、何と照合？","#365b73","その瞬間に見た表示と、手元で照合に使った情報を確かめる。実際の確認行動はまだわからない。",4,17]
+];
+
+const groups = [
+  ["a",785,111,"似た二つの間で",["a1","a2","c4"],"二つの問いで拾った点に、Bの担当者が取りに来る場所も重なって見える。"],
+  ["b",69,116,"手掛かりは、すでにある",["b1","b2","b3","check"],"品番は箱、袋、仕切り箱にもある。何を見て照合したかは未確認。"],
+  ["c",455,526,"Bの担当が、A棚へ",["c3","c4","c5"],"B担当者がA棚へ取りに行く経路が見える。なぜその場で別部品を選んだのかは未確認。"]
+];
+
+const fields = {
+  a:{color:"#9b4637",path:"M729 89C807 62 945 80 962 120C985 170 944 215 932 253C914 299 951 322 920 369C881 401 756 395 703 361C670 340 687 309 695 282C681 238 693 184 683 152Q679 116 729 89Z"},
+  b:{color:"#365b73",path:"M77 94C140 72 261 86 273 134C294 175 259 202 267 245C273 277 335 293 326 328C319 361 228 370 154 368C83 365 43 346 44 292C48 236 26 182 44 134Q53 103 77 94Z"},
+  c:{color:"#22685d",path:"M285 480C311 445 383 444 431 422C490 389 536 397 592 381C669 363 727 320 815 329C874 334 903 359 869 391C842 413 780 406 733 427C675 457 663 525 591 541C514 559 379 543 321 532Q276 518 285 480Z"}
+};
+
+const traces = {
+  display:{path:"M99 175Q104 187 120 196 M130 214Q135 223 140 229",color:"#365b73",refs:["b1","b2","b3"],label:"品番のある場所",reason:"担当者は品番のある場所を三つ挙げた。"},
+  detour:{path:"M459 479C515 469 600 451 635 419Q668 385 706 359",color:"#22685d",arrow:true,refs:["c5","c3","c4"],label:"共通部品だけA棚へ",reason:"Bの担当者が、A棚に集約された共通部品を取りに行く。A棚での一場面から、そこに至る動きまで見える。"},
+  place:{path:"M715 347Q684 330 707 305",color:"#9b4637",refs:["c4","a1"],label:"同じA棚",reason:"同じA棚が、間違いの起きた場所であり、Bの担当者が共通部品を取りに来る場所でもある。"},
+  verify:{path:"M149 251Q147 284 102 316",color:"#365b73",dash:"3 5",refs:["b1","b2","b3","check"],label:"表示がある。では、どこを見た？",reason:"箱・袋・仕切り箱に品番表示があったことから、表示の有無と、実際に何を見て照合したかを行き来して考えた。"}
+};
+
+const events = [
+  {topic:0},{point:"c1"},{point:"unknown"},
+  {topic:1},{point:"a2"},
+  {topic:2},{point:"a1"},
+  {topic:3},{point:"c3"},{point:"c4"},{point:"c5"},{trace:"detour"},
+  {topic:4},{point:"b1"},{point:"b2"},{point:"b3"},{trace:"display"},{point:"check"},
+  {caption:"一枚を読み返す",reason:"二つのA棚を見比べ、品番表示と、実際に見たものとの間にも目を移す。"},
+  {trace:"place"},{trace:"verify"},
+  {caption:"群れに名前を置く",reason:"調査の問いを残したまま、離れていた点が重なるところを描く。",names:true}
+];
+
+const svg = document.querySelector("#map");
+const detail = document.querySelector("#detail");
+const range = document.querySelector("#progress");
+const count = document.querySelector("#count");
+const NS = "http://www.w3.org/2000/svg";
+let selection = null;
+let step = events.length;
+range.max = String(events.length);
+
+function shape(parent, tag, attributes={}, content="") {
+  const el = document.createElementNS(NS, tag);
+  for (const [name,value] of Object.entries(attributes)) el.setAttribute(name, value);
+  if (content) el.textContent = content;
+  parent.append(el);
+  return el;
+}
+
+function selectable(element, label, item) {
+  element.setAttribute("tabindex","0");
+  element.setAttribute("role","button");
+  element.setAttribute("aria-label", label);
+  function choose() {
+    selection = selection?.id === item.id ? null : item;
+    render();
+    svg.querySelector('[data-id="' + item.id + '"]')?.focus({preventScroll:true});
+  }
+  element.dataset.id = item.id;
+  element.addEventListener("click", choose);
+  element.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      choose();
+    }
+  });
+}
+
+function labelInfo(label, reason, extra="") {
+  detail.replaceChildren();
+  const heading = document.createElement("strong");
+  heading.textContent = label;
+  detail.append(heading, document.createTextNode(reason));
+  if (extra) {
+    const small = document.createElement("small");
+    small.textContent = extra;
+    detail.append(small);
+  }
+}
+
+function render() {
+  svg.replaceChildren();
+  range.value = String(step);
+  count.value = step + " / " + events.length;
+  document.querySelector("#back").disabled = step === 0;
+  document.querySelector("#next").disabled = step === events.length;
+  const seen = events.slice(0, step);
+  const names = seen.some(event => event.names);
+  const existing = new Set(seen.map(event => event.point).filter(Boolean));
+  const marker = shape(shape(svg,"defs"),"marker",{id:"arrow",viewBox:"0 0 10 10",refX:9,refY:5,markerWidth:6,markerHeight:6,orient:"auto"});
+  shape(marker,"path",{d:"M1 1L9 5 1 9",fill:"none",stroke:"context-stroke","stroke-width":1.4});
+  const areaLayer = shape(svg,"g",{"aria-hidden":"true"});
+  if (names) {
+    for (const [id] of groups) {
+      const field = fields[id];
+      const active = selection?.id === id;
+      shape(areaLayer,"path",{d:field.path,fill:field.color,"fill-opacity":active ? .17 : .062,stroke:field.color,"stroke-opacity":active ? .77 : .37,"stroke-width":active?2.15:1.05});
+    }
+  }
+
+  shape(svg,"ellipse",{cx:506,cy:263,rx:110,ry:58,fill:"#fbf7eb",stroke:"#17313c","stroke-width":1.65});
+  shape(svg,"text",{x:506,y:257,fill:"#17313c","font-size":26,"font-weight":700,"text-anchor":"middle"},"部品ピッキング");
+  shape(svg,"text",{x:506,y:288,fill:"#17313c","font-size":26,"font-weight":700,"text-anchor":"middle"},"間違い");
+
+  for (const event of seen.filter(event => event.topic !== undefined)) {
+    const topic = topics[event.topic];
+    const group = shape(svg,"g",{class:"point question"});
+    shape(group,"path",{d:topic.spoke,fill:"none",stroke:"#46555a","stroke-width":1.3,"stroke-linecap":"round","aria-hidden":"true",class:"question-link"});
+    if (topic.refs.some(id => existing.has(id))) {
+      shape(group,"path",{d:topic.path,fill:"none",stroke:topic.ink,"stroke-width":1.25,"stroke-opacity":.6});
+    }
+    shape(group,"circle",{cx:topic.x,cy:topic.y-5,r:12,fill:topic.ink,"fill-opacity":0});
+    shape(group,"path",{d:"M"+topic.x+" "+(topic.y-10)+"l5 5-5 5-5-5Z",fill:"#fbf7eb",stroke:topic.ink,"stroke-width":1.55});
+    shape(group,"text",{x:topic.x+12,y:topic.y,fill:topic.ink,"font-size":17,"font-weight":700},topic.title);
+    const refs = topic.refs.filter(id => existing.has(id));
+    selectable(group,topic.title,{id:"topic"+event.topic,label:topic.title,reason:refs.length?source_text.dialogue[event.topic][1]:"この問いから、気になった点が次の手で現れます。",refs});
+  }
+
+  for (const event of seen.filter(event => event.trace)) {
+    const id = event.trace;
+    const mark = traces[id];
+    const group = shape(svg,"g",{class:"trace"});
+    shape(group,"path",{d:mark.path,fill:"none",stroke:mark.color,"stroke-opacity":0,"stroke-width":15,"pointer-events":"stroke"});
+    const attrs = {d:mark.path,fill:"none",stroke:mark.color,"stroke-width":1.7,"stroke-opacity":.65,"stroke-linecap":"round",class:"ink"};
+    if (mark.dash) attrs["stroke-dasharray"] = mark.dash;
+    if (mark.arrow) attrs["marker-end"] = "url(#arrow)";
+    shape(group,"path",attrs);
+    const linkedPoints = mark.refs.map(ref => points.find(point => point[0] === ref)[3]);
+    selectable(group,mark.label || linkedPoints.join("、")+" のつながり",{id,refs:mark.refs,label:mark.label || "この形で見えたこと",reason:mark.reason,extra:(events.indexOf(event)+1)+"手目"});
+  }
+
+  for (const [id,x,y,label,color,reason,section,size=16] of points) {
+    if (!existing.has(id)) continue;
+    const muted = selection?.refs && !selection.refs.includes(id);
+    const group = shape(svg,"g",{class:"point"+(muted?" ghost":"")+(selection?.id===id?" active":"")});
+    shape(group,"circle",{cx:x,cy:y,r:14,fill:color,"fill-opacity":0});
+    shape(group,"circle",{cx:x,cy:y,r:size>23?13:8,fill:"none",stroke:color,"stroke-width":1,opacity:0,class:"ring"});
+    const slant = id === "c3" ? -4 : 0;
+    shape(group,"circle",{cx:x,cy:y,r:size>23?4:2.8,fill:color});
+    shape(group,"text",{x:x+10,y:y+5,fill:size>=22?color:"#1d3038","font-size":size,"font-weight":size>=20?700:500,transform:"rotate("+slant+" "+x+" "+y+")"},label);
+    selectable(group,label,{id,label,reason,extra:source_text.dialogue[section].join("　")+"　•　"+(events.findIndex(event=>event.point===id)+1)+"手目"});
+  }
+
+  if (names) for (const [id,x,y,name,refs,reason,anchor="start"] of groups) {
+    const group = shape(svg,"g",{class:"island-label"});
+    const angle = {a:-4,b:-2,c:1,d:-2,e:-8,f:-2}[id];
+    shape(group,"text",{x,y,fill:fields[id].color,"font-size":["e","f"].includes(id)?18:21,"font-weight":700,"text-anchor":anchor,transform:"rotate("+angle+" "+x+" "+y+")"},name);
+    selectable(group,name,{id,label:name,reason,refs});
+  }
+  if (selection) {
+    labelInfo(selection.label,selection.reason,selection.extra);
+    return;
+  }
+  if (step === events.length) {
+    labelInfo("点・群れの名・つながりを選ぶ", "ひし形の点は調査中に置いた問い。選ぶと、そこから浮かんだ点が見えます。", "「最初から」で、点や形が現れた順を見られます。");
+    return;
+  }
+  if (step === 0) {
+    labelInfo("描き始め", "「›」で、一つずつ図に置いていきます。");
+    return;
+  }
+  const event = events[step-1];
+  if (event.point) {
+    const point = points.find(point => point[0] === event.point);
+    labelInfo(point[3],point[5],source_text.dialogue[point[6]].join("　"));
+  } else if (event.topic !== undefined) {
+    const topic = topics[event.topic];
+    labelInfo(topic.title,"この問いで、気になったところを次の手から置きます。");
+  } else if (event.trace) {
+    const trace = traces[event.trace];
+    labelInfo(trace.label || "形を置く",trace.reason);
+  } else {
+    labelInfo(event.caption,event.reason);
+  }
+}
+
+function goTo(value) {
+  step = Math.max(0,Math.min(events.length,value));
+  selection = null;
+  render();
+}
+document.querySelector("#start").onclick = () => goTo(0);
+document.querySelector("#back").onclick = () => goTo(step-1);
+document.querySelector("#next").onclick = () => goTo(step+1);
+document.querySelector("#all").onclick = () => goTo(events.length);
+range.oninput = () => goTo(Number(range.value));
+const dialogue = document.querySelector("#dialogue");
+for (const [speaker,line] of source_text.dialogue) {
+  const item = document.createElement("li");
+  item.textContent = speaker + "「" + line + "」";
+  dialogue.append(item);
+}
+render();
+</script>
+</html>

@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>点メモ花火｜点メモを読む</title>
+<style>
+:root{color-scheme:light;--paper:#eae6da;--ink:#172c38;--muted:#435964;--line:#c5bdac}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);margin:0;font:15px/1.65 system-ui,sans-serif}
+main{max-width:1160px;margin:auto;padding:22px clamp(12px,4vw,42px)}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+h1{font:700 clamp(29px,4vw,42px)/1.3 "Yu Mincho","Noto Serif CJK JP",serif;margin:0;letter-spacing:.05em}
+a{color:#405961;text-underline-offset:.23em}
+.controls{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:9px}
+button{background:#f7f2e6;border:1px solid #c6c3b9;color:inherit;border-radius:3px;padding:5px 10px;font:inherit;cursor:pointer}
+button:disabled{opacity:.4;cursor:default}
+input{accent-color:#47646a;flex:1;min-width:80px}
+output{font-variant-numeric:tabular-nums;min-width:47px;text-align:center}
+.board{background:#fbf7eb;border:1px solid var(--line);border-radius:2px;overflow:auto;max-width:100%}
+svg{display:block;width:100%;min-width:665px;height:auto;font-family:"Yu Mincho","Noto Serif CJK JP",serif}
+.point,.island-label,.trace{cursor:pointer;outline:none}
+.point:focus .ring,.point.active .ring{stroke-width:2;opacity:1}
+.point:hover text,.point:focus text,.island-label:focus text,.island-label:hover text{text-decoration:underline}
+.trace:focus .ink,.trace:hover .ink{stroke-width:2.9}
+.ghost{opacity:.22}
+.legend{min-height:85px;margin-top:10px;padding:10px 13px;background:#f7f2e5;border-left:3px solid #a34b39}
+.legend strong{margin-right:.75em}
+.legend small{display:block;color:var(--muted);font-size:13px}
+@media(max-width:700px){main{padding-top:14px}.controls{font-size:13px}}
+</style>
+<main>
+<header><h1>点メモ花火</h1><a href="https://qiita.com/hima2b4/items/77d9735ae320e89d2d72" target="_blank" rel="noopener">Qiitaの原文を読む ↗</a></header>
+<div class="controls">
+<button id="start">最初から</button><button id="back" aria-label="一つ戻る">‹</button>
+<input id="progress" type="range" min="0" value="0" aria-label="描いた順">
+<button id="next" aria-label="一つ進む">›</button><output id="count"></output><button id="all">全体を見る</button>
+</div>
+<div class="board"><svg id="map" viewBox="0 0 1000 650" aria-label="Qiita記事『点メモ』を題材にした点メモ花火"></svg></div>
+<div class="legend" id="detail" aria-live="polite"></div>
+</main>
+<script>
+const source_text = {
+  url: "https://qiita.com/hima2b4/items/77d9735ae320e89d2d72",
+  title: "KJ法 ——「点メモ」は超おすすめ！",
+  author: "hima2b4",
+  drawnBy: "ChatGPT",
+  process: "原文の順に置いた点と、図の再読で足した点・形を順送りにした。着目理由はAIによる読み。見立てを含む戻り道は図と説明に明記。"
+};
+
+const points = [
+  ["p1", 111, 154, "議事ラー", "#3b626e", "同じメモでも、誰かに役を任せて始める場がある。", "メモや備忘録"],
+  ["p2", 84, 195, "「今日の議事は誰？」", "#3b626e", "記録を取る役が決まる瞬間の、会議の声が残る。", "メモや備忘録"],
+  ["p3", 126, 272, "「何と書いたのか…」", "#3b626e", "字の判読しづらさもあり、書いた本人にもそのメモがわからなくなる。", "メモや備忘録", 20],
+  ["p4", 560, 164, "心に波風が起こって", "#a34932", "賛成でも反対でも、聞いている最中に反応が起こる。", "出会い・川喜田二郎からの引用", 24],
+  ["p5", 663, 215, "すかさずメモ", "#a34932", "気づいてから書くまでの短さが、言い方にも出ている。", "出会い・川喜田二郎からの引用"],
+  ["p6", 633, 366, "咳払いまで書く？", "#55694d", "電話の途中で聞こえた音のうち、何が手元に残るか。", "出会い・川喜田二郎からの引用"],
+  ["p7", 583, 438, "花", "#55694d", "花子さん、病院、勤務のあと。これだけで本人には場面が続いている。", "出会い・川喜田二郎からの引用", 64],
+  ["p8", 713, 483, "他人には暗号", "#55694d", "同じ一語を見ても、書いた人と他の人には別のものが見える。", "出会い・川喜田二郎からの引用"],
+  ["p9", 619, 104, "客が帰って半時間", "#a34932", "場を離れたあと、覚えていた話から何かが落ちていく。", "出会い・川喜田二郎からの引用"],
+  ["p10", 750, 262, "情報のビタミン", "#a34932", "情報が残っていても、そのままでは同じ働きをしないという比喩。", "出会い・川喜田二郎からの引用"],
+  ["p11", 774, 386, "肉づけして清書", "#55694d", "短い記録を起点に、あとで他の形へひらける。", "出会い・川喜田二郎からの引用"],
+  ["p12", 945, 540, "プンプン土の匂い", "#795721", "何が残っているのかを、説明より先に鼻で想像できる。", "出会い・川喜田二郎からの引用", 18, "end"],
+  ["p13", 939, 577, "洗剤で洗った大根やレタス", "#795721", "整った外観と、残っているものの手触りが離れていく。", "出会い・川喜田二郎からの引用", 16, "end"],
+  ["p14", 148, 328, "「何だったかなぁ」が減った", "#3b626e", "冒頭で困っていたことが、筆者自身の実感として出直す。", "私なりの効用", 17],
+  ["p15", 155, 417, "流れを崩さず伝えられる", "#3b626e", "自分用のメモから、第三者へ話す仕事に届いている。", "私なりの効用"],
+  ["p16", 348, 535, "線は気負わず", "#6c6972", "つながりに気づいたときの、鉛筆を持つ手の軽さがある。", "書き方・補足"],
+  ["p17", 749, 128, "二分、五分、一時間", "#a34932", "時計の刻みで、記憶がずれていく時間を想像できる。", "最後に・川喜田二郎からの引用"],
+  ["p18", 930, 187, "好きな方向に歪む", "#a34932", "時間とともにただ薄れるだけでなく、方向がつく。", "最後に・川喜田二郎からの引用", 16, "end"],
+  ["p19", 487, 83, "パチッ", "#ad4435", "写真を撮る音が、書くタイミングを一瞬に縮める。", "最後に・川喜田二郎からの引用", 21],
+  ["p20", 557, 289, "点メモを見て聞けばいい", "#496a60", "図の再読で拾った。川喜田二郎が、話が済んでから質問を考えるのでは遅いと述べるところに戻った。", "出会い・川喜田二郎からの引用／図の読み返し"],
+  ["p21", 224, 587, "正解はない", "#6c6972", "図を見返して浮かんだ。同じ短さでも人ごとに戻れる書き方が違う。その自由は、いったん外に置いて眺めたい。", "書き方・補足／図の読み返し"],
+  ["p22", 420, 126, "聞いているうちに", "#496a60", "図の再読で拾った。話を聞いている時間の中に、波風が立つ瞬間と、メモを手がかりに質問する時間の両方がある。", "出会い・川喜田二郎からの引用／図の読み返し"]
+];
+
+const groups = [
+  ["a", 63, 104, "書いたあと、何が伝わる？", ["p1","p2","p3","p14","p15"], "議事録を取る人が決まる場面から、書いた本人にさえ伝わらないメモへ。「花」と行き来すると、残った言葉がどう第三者まで届くのかも気になってくる。"],
+  ["b", 560, 53, "その場の一瞬が、ずれていく", ["p4","p5","p9","p10","p17","p18","p19"], "客を見送った後の半時間と、写真の一瞬を同じ場所に置いて眺める。"],
+  ["c", 734, 347, "一字から、場がひらく", ["p6","p7","p8","p11"], "「花」から、思い出す、話をふくらませる、へ。左側の「流れを崩さず伝えられる」まで目を移すと、一語の働きが書き手の外へも広がる。"],
+  ["d", 929, 611, "洗い落とす手前", ["p12","p13"], "土を洗うとき、いっしょに何が落ちるのだろう。", "end"],
+  ["e", 176, 543, "どこまで手を入れる？", ["p16","p21"], "どこまで線を引くかも、自分にわかる書き方も、場面に合わせて決まる。「咳払いまで書く？」は、その同じ加減を別の場所から問いかけているように見える。"],
+  ["f", 519, 329, "聞きながら、次を聞く", ["p22","p4","p5","p20"], "聞いている途中で気になり、書き、その点を見て質問する。返事をまた聞くところまでを点線で示した。そこから先は図の読み返しで浮かんだ見立て。"]
+];
+
+// Contours mark where the words gather on this particular sheet.
+const fields = {
+  a: {color:"#315f73", path:"M64 84C139 65 276 57 344 93C367 145 339 208 356 261C364 303 422 327 384 389C394 418 391 432 347 449C249 468 135 469 72 445C37 420 34 333 48 285C34 239 27 165 41 120Q45 98 64 84Z"},
+  b: {color:"#ac4a36", path:"M475 53C525 28 665 25 732 27C840 22 924 40 949 81C969 122 970 172 946 204C926 225 920 274 864 279C796 291 744 286 717 253C678 243 660 239 631 231C579 215 552 188 553 151C566 114 526 108 481 108Q462 105 456 99Q444 72 475 53Z"},
+  c: {color:"#737245", path:"M681 350C716 335 760 325 813 324C870 320 939 331 949 361C962 393 926 412 896 426C860 454 884 483 833 503C765 514 673 500 623 502C574 501 550 477 562 438C561 414 586 397 607 378Q623 349 665 337Z"},
+  d: {color:"#9a6b2c", path:"M757 532C822 514 910 512 950 519Q982 534 976 576C977 610 940 627 881 626C809 635 710 611 701 578Q688 548 757 519Z"},
+  e: {color:"#616272", path:"M159 514C230 488 294 505 361 510C412 512 471 515 484 542C482 574 431 593 396 600C305 626 222 623 193 604Q158 576 159 514Z"},
+  f: {color:"#20796c", path:"M403 117C436 103 483 111 516 112C564 116 609 129 661 132C727 135 802 133 798 163C797 176 752 178 752 187C754 197 792 196 784 220C777 243 713 256 736 269C765 285 759 312 719 322C680 335 586 345 541 339C500 329 485 296 500 270C518 242 536 226 505 206C482 193 427 196 405 171Q381 147 403 117Z"}
+};
+
+const traces = {
+  now: {path:"M598 180Q649 182 660 207", color:"#a34932", arrow:true, refs:["p4","p5"], reason:"波風のあと、間を置かずに手が動く。"},
+  flesh: {path:"M647 415Q697 384 757 386", color:"#55694d", arrow:true, refs:["p7","p11"], reason:"一語の手控えから、あとで話をふくらませることもできる。"},
+  minutes: {path:"M622 112Q654 147 734 135", color:"#a34932", refs:["p9","p17"], reason:"場を離れてからの半時間と、体験がずれていく刻みが重なる。"},
+  gap: {path:"M141 253Q265 209 344 270 M351 278Q435 367 574 425", color:"#3b626e", refs:["p3","p7"], reason:"読み返せないメモと、一語で場面へ戻れるメモ。二つの経験の食い違いが、途中の切れ目として現れた。"},
+  listening: {path:"M461 140Q497 145 547 159", color:"#496a60", arrow:true, refs:["p22","p4"], reason:"話を聞いているうちに何かが気になる。賛成でも反対でも、そのときに引っかかったところが残る。"},
+  ask: {path:"M668 230C676 251 629 274 570 281", color:"#496a60", arrow:true, refs:["p5","p20"], reason:"気づいたことをその場で書く。質問するときに、その点を見て聞く。二つとも川喜田二郎が語っている動き。"},
+  reply: {path:"M548 283C505 269 554 209 523 193C497 179 421 203 421 145", color:"#496a60", arrow:true, dash:"3 6", refs:["p20","p22","p4","p5"], label:"返事をまた聞く？", note:[539,218,"返事をまた聞く？",0], reason:"質問して返ってきた話を、その場でまた聞くのではないか。気にかかるものがそこでまた現れるかもしれない。この戻り道は図を眺めて浮かんだ読みで、原文に循環として描かれているわけではない。"},
+  handoff: {path:"M573 454C511 481 449 466 397 443Q367 429 342 432Q257 445 163 431", color:"#446773", arrow:true, refs:["p7","p8","p11","p15"], label:"自分の一字から、相手に届く話へ", note:[416,488,"相手に話して渡す",9], reason:"「花」だけでは他人には暗号。それでも、本人が場面に戻れれば、そのことを第三者に流れを崩さず話せる。左の点と重ねて見ると、自分用の記録と人に渡す話のあいだに、書き手が場面を思い出すひと手間が見えてきた。"},
+  soil: {path:"M757 272C891 275 978 278 978 351S977 480 950 513", color:"#795721", dash:"3 8", refs:["p10","p12"], reason:"ビタミンと土の匂い。どちらも、まだ加工していないものに何が残っているかを、別々の感覚で伝える。"}
+};
+
+const events = [];
+for (const point of points.slice(0,19)) {
+  events.push({point:point[0]});
+  const trace = {p5:"now",p11:"flesh",p17:"minutes"}[point[0]];
+  if (trace) events.push({trace});
+}
+events.push(
+  {caption:"図を読み返す", reason:"離れたところを行き来して、最初に読んだときには一緒に見えなかった点を見ます。"},
+  {trace:"gap"}, {point:"p20"}, {trace:"ask"}, {point:"p21"}, {trace:"soil"}, {trace:"handoff"},
+  {point:"p22"}, {trace:"listening"}, {trace:"reply"},
+  {caption:"見えてきた群れに名前を置く", reason:"うすい輪郭が群れを示します。名前を選ぶと、その像をつくった点が浮かびます。", names:true}
+);
+
+const svg = document.querySelector("#map");
+const detail = document.querySelector("#detail");
+const range = document.querySelector("#progress");
+const count = document.querySelector("#count");
+const NS = "http://www.w3.org/2000/svg";
+let selection = null;
+let step = events.length;
+range.max = String(events.length);
+
+function shape(parent, tag, attributes={}, content="") {
+  const el = document.createElementNS(NS, tag);
+  for (const [name,value] of Object.entries(attributes)) el.setAttribute(name, value);
+  if (content) el.textContent = content;
+  parent.append(el);
+  return el;
+}
+
+function selectable(element, label, item) {
+  element.setAttribute("tabindex","0");
+  element.setAttribute("role","button");
+  element.setAttribute("aria-label", label);
+  function choose() {
+    selection = selection?.id === item.id ? null : item;
+    render();
+    svg.querySelector('[data-id="' + item.id + '"]')?.focus({preventScroll:true});
+  }
+  element.dataset.id = item.id;
+  element.addEventListener("click", choose);
+  element.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      choose();
+    }
+  });
+}
+
+function labelInfo(label, reason, extra="") {
+  detail.replaceChildren();
+  const heading = document.createElement("strong");
+  heading.textContent = label;
+  detail.append(heading, document.createTextNode(reason));
+  if (extra) {
+    const small = document.createElement("small");
+    small.textContent = extra;
+    detail.append(small);
+  }
+}
+
+function render() {
+  svg.replaceChildren();
+  range.value = String(step);
+  count.value = step + " / " + events.length;
+  document.querySelector("#back").disabled = step === 0;
+  document.querySelector("#next").disabled = step === events.length;
+  const seen = events.slice(0, step);
+  const names = seen.some(event => event.names);
+  const existing = new Set(seen.map(event => event.point).filter(Boolean));
+  const marker = shape(shape(svg,"defs"),"marker",{id:"arrow",viewBox:"0 0 10 10",refX:9,refY:5,markerWidth:6,markerHeight:6,orient:"auto"});
+  shape(marker,"path",{d:"M1 1L9 5 1 9",fill:"none",stroke:"context-stroke","stroke-width":1.4});
+  const areaLayer = shape(svg,"g",{"aria-hidden":"true"});
+  if (names) {
+    for (const [id] of groups) {
+      const field = fields[id];
+      const active = selection?.id === id;
+      shape(areaLayer,"path",{d:field.path,fill:field.color,"fill-opacity":active ? .17 : .062,stroke:field.color,"stroke-opacity":active ? .77 : .37,"stroke-width":active?2.15:1.05});
+    }
+  }
+
+  shape(svg,"path",{d:"M378 231C365 199 417 187 465 191C515 195 538 227 510 252C482 275 399 273 377 245 M382 234C383 257 427 269 480 263",fill:"none",stroke:"#17313c","stroke-width":1.65,"stroke-opacity":.84,"stroke-linecap":"round"});
+  shape(svg,"text",{x:449,y:243,fill:"#17313c","font-size":42,"font-weight":700,"text-anchor":"middle","letter-spacing":".08em",transform:"rotate(-4 449 235)"},"点メモ");
+
+  for (const event of seen.filter(event => event.trace)) {
+    const id = event.trace;
+    const mark = traces[id];
+    const group = shape(svg,"g",{class:"trace"});
+    shape(group,"path",{d:mark.path,fill:"none",stroke:mark.color,"stroke-opacity":0,"stroke-width":15,"pointer-events":"stroke"});
+    const attrs = {d:mark.path,fill:"none",stroke:mark.color,"stroke-width":1.7,"stroke-opacity":.65,"stroke-linecap":"round",class:"ink"};
+    if (mark.dash) attrs["stroke-dasharray"] = mark.dash;
+    if (mark.arrow) attrs["marker-end"] = "url(#arrow)";
+    shape(group,"path",attrs);
+    if (mark.note) {
+      const [x,y,text,angle] = mark.note;
+      shape(group,"text",{x,y,fill:mark.color,"font-size":13,"text-anchor":id==="reply"?"start":"middle",transform:"rotate("+angle+" "+x+" "+y+")"}, text);
+    }
+    const linkedPoints = mark.refs.map(ref => points.find(point => point[0] === ref)[3]);
+    selectable(group,mark.label || linkedPoints.join("、")+" のつながり",{id,refs:mark.refs,label:mark.label || "この形で見えたこと",reason:mark.reason,extra:(events.indexOf(event)+1)+"手目"});
+  }
+
+  for (const [id,x,y,label,color,reason,section,size=16,anchor="start"] of points) {
+    if (!existing.has(id)) continue;
+    const muted = selection?.refs && !selection.refs.includes(id);
+    const group = shape(svg,"g",{class:"point"+(muted?" ghost":"")+(selection?.id===id?" active":"")});
+    shape(group,"circle",{cx:x,cy:y,r:14,fill:color,"fill-opacity":0});
+    shape(group,"circle",{cx:x,cy:y,r:size>23?13:8,fill:"none",stroke:color,"stroke-width":1,opacity:0,class:"ring"});
+    const weight = size>=18 ? 700 : 500;
+    const slant = {p1:-7,p3:-2,p4:-3,p8:3,p12:-3,p16:-5,p19:-12,p21:4}[id] || 0;
+    if (id === "p7") {
+      shape(group,"circle",{cx:620,cy:437,r:38,fill:color,"fill-opacity":0});
+      shape(group,"path",{d:"M581 437C578 417 600 399 628 402C659 407 664 441 643 461C624 478 594 474 585 458 M584 444C582 462 597 476 620 473",fill:"none",stroke:"#ad4435","stroke-width":2,"stroke-linecap":"round"});
+      shape(group,"text",{x:622,y:455,fill:"#8c3326","font-size":size,"font-weight":700,"text-anchor":"middle",transform:"rotate(-8 622 438)"},label);
+    } else {
+      if (["p2","p3","p5","p10","p11","p14","p17","p20","p22"].includes(id)) {
+        shape(group,"circle",{cx:x,cy:y,r:id==="p3"?3.8:2.6,fill:color});
+      }
+      if (["p9","p12","p13","p15","p19"].includes(id)) {
+        const d = anchor==="end" ? "M"+(x-8)+" "+(y-3)+"l8 6" : "M"+(x-6)+" "+(y+3)+"l8 -6";
+        shape(group,"path",{d,fill:"none",stroke:color,"stroke-width":1.55,"stroke-linecap":"round"});
+      }
+      const fill = id==="p19" ? "#ad4435" : "#1d3038";
+      shape(group,"text",{x:x+(anchor==="end"?-13:9),y:y+5,"text-anchor":anchor,fill,"font-size":id==="p19"?27:size,"font-weight":weight,transform:"rotate("+slant+" "+x+" "+y+")"},label);
+    }
+    selectable(group,label,{id,label,reason,extra:section+"　•　"+(events.findIndex(event=>event.point===id)+1)+"手目"});
+  }
+
+  if (names) for (const [id,x,y,name,refs,reason,anchor="start"] of groups) {
+    const group = shape(svg,"g",{class:"island-label"});
+    const angle = {a:-4,b:-2,c:1,d:-2,e:-8,f:-2}[id];
+    shape(group,"text",{x,y,fill:fields[id].color,"font-size":["e","f"].includes(id)?18:21,"font-weight":700,"text-anchor":anchor,transform:"rotate("+angle+" "+x+" "+y+")"},name);
+    selectable(group,name,{id,label:name,reason,refs});
+  }
+  if (selection) {
+    labelInfo(selection.label,selection.reason,selection.extra);
+    return;
+  }
+  if (step === events.length) {
+    labelInfo("点・群れの名・つながりを選ぶ", "着目した理由と、点のつながりをたどれます。", "「最初から」で、点や形が現れた順を見られます。");
+    return;
+  }
+  if (step === 0) {
+    labelInfo("描き始め", "「›」で、一つずつ図に置いていきます。");
+    return;
+  }
+  const event = events[step-1];
+  if (event.point) {
+    const point = points.find(point => point[0] === event.point);
+    labelInfo(point[3],point[5],point[6]);
+  } else if (event.trace) {
+    const trace = traces[event.trace];
+    labelInfo(trace.label || "形を置く",trace.reason);
+  } else {
+    labelInfo(event.caption,event.reason);
+  }
+}
+
+function goTo(value) {
+  step = Math.max(0,Math.min(events.length,value));
+  selection = null;
+  render();
+}
+document.querySelector("#start").onclick = () => goTo(0);
+document.querySelector("#back").onclick = () => goTo(step-1);
+document.querySelector("#next").onclick = () => goTo(step+1);
+document.querySelector("#all").onclick = () => goTo(events.length);
+range.oninput = () => goTo(Number(range.value));
+render();
+</script>
+</html>

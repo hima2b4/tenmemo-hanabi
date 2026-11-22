@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>点メモ花火｜夏目漱石『こころ』</title>
+<style>
+:root{color-scheme:light;--paper:#eae6da;--ink:#172c38;--muted:#435964;--line:#c5bdac}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);margin:0;font:15px/1.65 system-ui,sans-serif}
+main{max-width:1160px;margin:auto;padding:22px clamp(12px,4vw,42px)}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+h1{font:700 clamp(29px,4vw,42px)/1.3 "Yu Mincho","Noto Serif CJK JP",serif;margin:0;letter-spacing:.05em}
+a{color:#405961;text-underline-offset:.23em}
+.controls{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:9px}
+button{background:#f7f2e6;border:1px solid #c6c3b9;color:inherit;border-radius:3px;padding:5px 10px;font:inherit;cursor:pointer}
+button:disabled{opacity:.4;cursor:default}
+input{accent-color:#47646a;flex:1;min-width:80px}
+output{font-variant-numeric:tabular-nums;min-width:47px;text-align:center}
+.board{background:#fbf7eb;border:1px solid var(--line);border-radius:2px;overflow:auto;max-width:100%}
+svg{display:block;width:100%;min-width:665px;height:auto;font-family:"Yu Mincho","Noto Serif CJK JP",serif}
+.point,.island-label,.trace{cursor:pointer;outline:none}
+.point:focus .ring,.point.active .ring{stroke-width:2;opacity:1}
+.point:hover text,.point:focus text,.island-label:focus text,.island-label:hover text{text-decoration:underline}
+.trace:focus .ink,.trace:hover .ink{stroke-width:2.9}
+.ghost{opacity:.22}
+.legend{min-height:85px;margin-top:10px;padding:10px 13px;background:#f7f2e5;border-left:3px solid #a34b39}
+details{margin:12px 0;color:var(--muted)}
+summary{cursor:pointer}
+.legend strong{margin-right:.75em}
+.legend small{display:block;color:var(--muted);font-size:13px}
+@media(max-width:700px){main{padding-top:14px}.controls{font-size:13px}}
+</style>
+<main>
+<header><h1>点メモ花火</h1><span>夏目漱石『こころ』</span></header>
+<div class="controls">
+<button id="start">最初から</button><button id="back" aria-label="一つ戻る">‹</button>
+<input id="progress" type="range" min="0" value="0" aria-label="描いた順">
+<button id="next" aria-label="一つ進む">›</button><output id="count"></output><button id="all">全体を見る</button>
+</div>
+<div class="board"><svg id="map" viewBox="0 0 1400 830" aria-label="夏目漱石『こころ』の点メモ花火"></svg></div>
+<div class="legend" id="detail" aria-live="polite"></div>
+<details><summary>もとの図と読み方について</summary><ol id="dialogue"></ol></details>
+</main>
+<script>
+const source_text = {
+  sources:[
+    ["添付図","先生との出会い・墓参り"],
+    ["添付図","父の病気・汽車で読む遺書"],
+    ["添付図","先生の遺書・妻に伏せること"],
+    ["添付図","Kの遺書・Kとの間に起きたこと"]
+  ],
+  note:"添付された図の文言をもとに描き直した。長い点は場面に戻れる範囲で短くした。順送りは登場した話題から後でわかることへたどる構成で、原文の逐語順ではない。図中の問いと群れ名は描き直しで添えた読み。"
+};
+
+const topics = [
+  {x:446,y:330,title:"先生と、墓参り",refs:["g0","g1","g2","g3","grave"],ink:"#80543b",spoke:"M526 374Q488 354 450 327",path:"M433 320Q417 310 400 296",branchPoint:"grave"},
+  {x:760,y:339,title:"汽車の中の遺書",refs:["t0","t1","t2","t3","t4","t5","letters"],ink:"#365b73",spoke:"M698 372Q735 353 757 337",path:"M827 318Q866 321 924 322",branchPoint:"letters"},
+  {x:528,y:494,title:"先生とKのあいだ",refs:["l0","l1","l2","l3"],ink:"#74546e",spoke:"M575 429Q559 454 531 487",path:"M523 503Q499 530 481 543"}
+];
+
+const points = [
+  ["g0",99,172,"雑司ヶ谷の墓へ、例月、花を手向ける","#80543b","毎月、同じ墓へ通う。相手の名がまだわからないまま、仕草が残る。",0,20],
+  ["g1",127,212,"あそこには私の友達の墓がある","#80543b","先生は友達だと話す。名のないままの言葉を近くに置いた。",0,18],
+  ["g2",114,331,"妻さえ連れて行ったことがない","#80543b","墓参りには妻を連れて行かない。その事実は、後で妻に伏せるという点にも響く。",0,18],
+  ["t0",855,117,"父の病気、腎臓の重患","#365b73","遺書を受け取る前から「私」には父のもとへ戻るかという問題がある。",1,17],
+  ["t1",810,161,"分厚い遺書","#365b73","厚さが手触りとして残る。後でKの遺書の短さと並べられる。",1,26],
+  ["t2",904,211,"汽車の中で読み始める","#365b73","「私」がいま読む場面。その紙に書かれた先生の過去へ入っていく。",1,18],
+  ["l0",102,471,"「恋は罪悪ですよ」","#74546e","先に先生の言葉だけが置かれ、その中身はまだ見えない。この読み始めの響きを残した。",2,23],
+  ["l1",143,579,"Kもお嬢さんを愛していた","#74546e","先に出た先生の恋に、Kの側からも同じ人が重なってくる。",3,19],
+  ["l2",279,636,"Kの留守に、母へ結婚を申し込む","#74546e","『留守に』を残すと、何をしたかに、そのときKがいなかったことも残る。",2,19],
+  ["l3",121,697,"卑怯","#74546e","図にあった短い言葉。誰のどんな行為を指して響くか、近くの点を読めるようにした。",2,20],
+  ["g3",157,378,"毎月通ったのは、Kの墓だった","#80543b","遺書をたどったあとで墓参りが見え直す。友達の墓という言葉に名前が戻る。",0,20],
+  ["t3",1070,450,"Kの遺書は短い","#365b73","二通を並べると、書き残す量に差がある。",3,23],
+  ["t4",1117,492,"誰への恨みもない","#365b73","その短さと、恨みが書かれていないことを、二つの点として残した。",3,18],
+  ["t5",877,400,"妻の生きている間は、秘密を守ってほしい","#365b73","先生は「私」に話を残す一方、妻には伏せてほしいと頼む。二通を見比べたあとで、長さに加えて『誰に』が気になった。",2,18],
+  ["grave",389,274,"誰の墓だった？","#80543b","例月の墓参り、名を教えない先生、Kの墓だったという後からの読みが集まる場所。",0,21,{width:176,height:42}],
+  ["letters",1035,324,"誰に、何を残す？","#365b73","先生の分厚い遺書とKの短い遺書。先生が「私」に書き、妻には秘密にしてほしいと託したことも、ここからたどれる。",2,23,{width:222,height:45}]
+];
+
+const groups = [
+  ["a",91,126,"あとから名前が戻る",["g0","g1","g2","g3","grave"],"月ごとの墓参りに、遺書を読んだあとでKの名前が戻る。妻を連れて行かない点から、妻への秘密にも渡れる。"],
+  ["b",1041,100,"残すもの、伏せるもの",["t0","t1","t2","t3","t4","t5","letters"],"二通の厚さと、誰に話を残すのかを眺める。Kが何を考えて短く書いたかは、この図からはわからない。"],
+  ["c",301,755,"「罪悪」に場面が重なる",["l0","l1","l2","l3"],"先に置かれた言葉を、Kも恋をしていたことと、Kの留守中の申し込みの近くでもう一度読む。"]
+];
+
+const fields = {
+  a:{color:"#80543b",path:"M97 103C179 82 448 91 490 122C529 166 494 201 494 249C498 302 541 354 489 387C445 418 310 416 221 421C130 426 55 393 55 328C38 268 45 221 51 164Q57 128 97 103Z"},
+  b:{color:"#365b73",path:"M833 100C934 65 1169 59 1276 102C1347 133 1327 218 1340 284C1352 360 1386 487 1337 528C1305 564 1168 572 1062 562C983 555 892 527 861 478C835 439 856 381 829 326C794 281 802 229 780 183Q755 132 833 100Z"},
+  c:{color:"#74546e",path:"M89 445C197 417 323 437 415 470C488 496 494 539 517 588C550 616 638 656 612 706C583 775 413 796 292 782C206 776 74 769 63 713C52 665 73 620 63 588Q38 495 89 445Z"}
+};
+
+const traces = {
+  ritual:{path:"M103 187Q107 194 121 203",color:"#80543b",refs:["g0","g1"],label:"墓参りと、名のない友達",reason:"墓は見えているのに、誰が眠っているのかはまだ見えない。"},
+  train:{path:"M819 176Q844 192 892 205",color:"#365b73",refs:["t1","t2"],label:"手元の遺書を開く",reason:"紙の厚さが残り、次に汽車の中でその紙を読み始める。"},
+  wrong:{path:"M152 594Q177 622 268 629 M272 650Q208 665 135 689",color:"#74546e",refs:["l1","l2","l3"],label:"Kの留守に",reason:"Kも恋をしていたと知り、Kがいないときに申し込んだ行為を読み返す。"},
+  returnGrave:{path:"M91 179C51 222 65 316 88 356Q107 381 147 378",color:"#80543b",arrow:true,refs:["g0","g3"],label:"毎月の墓参りにKの名前が戻る",reason:"同じ墓参りを、Kのことがわかったあとに見る。行動は同じでも、見える場面が変わる。"},
+  nameGrave:{path:"M390 296Q412 326 429 365",color:"#80543b",refs:["grave","g3"],label:"誰の墓だった？",reason:"初めて見た墓参りの場面へ戻る小さな中心。"},
+  recall:{path:"M468 374C537 368 542 306 552 270C591 184 709 177 793 163",color:"#80543b",dash:"4 7",refs:["g3","t1"],label:"遺書を読んで、墓参りへ戻る",note:[699,231,"遺書を読むと、墓参りが見え直す"],reason:"遺書で知ったKのことを抱えて、例月の墓参りを思い返す。出来事の順序を示す線ではなく、後から読みが戻る道。"},
+  compare:{path:"M933 302C916 274 866 243 852 185 M1146 324C1307 319 1329 377 1285 429Q1273 443 1254 450 M1077 462Q1087 479 1106 485",color:"#365b73",refs:["letters","t1","t3","t4"],label:"長い一通と、短い一通",reason:"「誰に、何を残す？」から、上の先生の遺書と下のKの遺書を見比べる。"},
+  conceal:{path:"M1033 348Q1007 366 1018 385",color:"#365b73",refs:["letters","t5"],label:"明かす相手と、伏せる相手",reason:"先生の遺書を読める「私」と、秘密を伏せておいてほしいと託された妻の位置が異なる。"},
+  echo:{path:"M106 490C65 540 98 629 265 626",color:"#74546e",dash:"3 6",refs:["l0","l2"],label:"先の一言へ読みが戻る",reason:"あとから具体的な行為を読んで、先に聞いた『恋は罪悪』へ戻る。先生の一言を、その出来事に照らして読める。"}
+};
+
+const events = [
+  {topic:0},{point:"g0"},{point:"g1"},{trace:"ritual"},{point:"g2"},
+  {topic:1},{point:"t0"},{point:"t1"},{point:"t2"},{trace:"train"},
+  {topic:2},{point:"l0"},{point:"l1"},{point:"l2"},{point:"l3"},{trace:"wrong"},
+  {point:"t3"},{point:"t4"},{point:"t5"},{point:"g3"},
+  {caption:"一枚を読み返す",reason:"墓参りと遺書を行き来する。二通の遺書と、妻に秘密を守ってほしいという言葉を並べる。"},
+  {point:"grave"},{trace:"returnGrave"},{trace:"nameGrave"},{trace:"recall"},
+  {point:"letters"},{trace:"compare"},{trace:"conceal"},{trace:"echo"},
+  {caption:"まとまって見えたところを囲む",reason:"墓参り、二通の遺書、あとから別の響きを持つ言葉を、それぞれたどれるようにする。",names:true}
+];
+
+const svg = document.querySelector("#map");
+const detail = document.querySelector("#detail");
+const range = document.querySelector("#progress");
+const count = document.querySelector("#count");
+const NS = "http://www.w3.org/2000/svg";
+let selection = null;
+let step = events.length;
+range.max = String(events.length);
+
+function shape(parent, tag, attributes={}, content="") {
+  const el = document.createElementNS(NS, tag);
+  for (const [name,value] of Object.entries(attributes)) el.setAttribute(name, value);
+  if (content) el.textContent = content;
+  parent.append(el);
+  return el;
+}
+
+function selectable(element, label, item) {
+  element.setAttribute("tabindex","0");
+  element.setAttribute("role","button");
+  element.setAttribute("aria-label", label);
+  function choose() {
+    selection = selection?.id === item.id ? null : item;
+    render();
+    svg.querySelector('[data-id="' + item.id + '"]')?.focus({preventScroll:true});
+  }
+  element.dataset.id = item.id;
+  element.addEventListener("click", choose);
+  element.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      choose();
+    }
+  });
+}
+
+function labelInfo(label, reason, extra="") {
+  detail.replaceChildren();
+  const heading = document.createElement("strong");
+  heading.textContent = label;
+  detail.append(heading, document.createTextNode(reason));
+  if (extra) {
+    const small = document.createElement("small");
+    small.textContent = extra;
+    detail.append(small);
+
+  }
+}
+
+function render() {
+  svg.replaceChildren();
+  range.value = String(step);
+  count.value = step + " / " + events.length;
+  document.querySelector("#back").disabled = step === 0;
+  document.querySelector("#next").disabled = step === events.length;
+  const seen = events.slice(0, step);
+  const names = seen.some(event => event.names);
+  const existing = new Set(seen.map(event => event.point).filter(Boolean));
+  const marker = shape(shape(svg,"defs"),"marker",{id:"arrow",viewBox:"0 0 10 10",refX:9,refY:5,markerWidth:6,markerHeight:6,orient:"auto"});
+  shape(marker,"path",{d:"M1 1L9 5 1 9",fill:"none",stroke:"context-stroke","stroke-width":1.4});
+  const areaLayer = shape(svg,"g",{"aria-hidden":"true"});
+  if (names) {
+    for (const [id] of groups) {
+      const field = fields[id];
+      const active = selection?.id === id;
+      shape(areaLayer,"path",{d:field.path,fill:field.color,"fill-opacity":active ? .17 : .062,stroke:field.color,"stroke-opacity":active ? .77 : .37,"stroke-width":active?2.15:1.05});
+    }
+  }
+
+  shape(svg,"ellipse",{cx:608,cy:390,rx:95,ry:48,fill:"#fbf7eb",stroke:"#17313c","stroke-width":1.7});
+  shape(svg,"text",{x:608,y:403,fill:"#17313c","font-size":43,"font-weight":700,"text-anchor":"middle"},"こころ");
+
+  for (const event of seen.filter(event => event.topic !== undefined)) {
+    const topic = topics[event.topic];
+    const group = shape(svg,"g",{class:"point question"});
+    shape(group,"path",{d:topic.spoke,fill:"none",stroke:"#46555a","stroke-width":1.3,"stroke-linecap":"round","aria-hidden":"true",class:"question-link"});
+    if (topic.branchPoint ? existing.has(topic.branchPoint) : topic.refs.some(id => existing.has(id))) {
+      shape(group,"path",{d:topic.path,fill:"none",stroke:topic.ink,"stroke-width":1.25,"stroke-opacity":.6});
+    }
+    shape(group,"circle",{cx:topic.x,cy:topic.y-5,r:12,fill:topic.ink,"fill-opacity":0});
+    shape(group,"path",{d:"M"+topic.x+" "+(topic.y-10)+"l5 5-5 5-5-5Z",fill:"#fbf7eb",stroke:topic.ink,"stroke-width":1.55});
+    shape(group,"text",{x:topic.x+12,y:topic.y,fill:topic.ink,"font-size":17,"font-weight":700},topic.title);
+    const refs = topic.refs.filter(id => existing.has(id));
+    selectable(group,topic.title,{id:"topic"+event.topic,label:topic.title,reason:refs.length?"この問いから拾った点が浮かびます。":"この問いで気になった点を、次の手から置いていきます。",refs});
+  }
+
+  for (const event of seen.filter(event => event.trace)) {
+    const id = event.trace;
+    const mark = traces[id];
+    const group = shape(svg,"g",{class:"trace"});
+    shape(group,"path",{d:mark.path,fill:"none",stroke:mark.color,"stroke-opacity":0,"stroke-width":15,"pointer-events":"stroke"});
+    const attrs = {d:mark.path,fill:"none",stroke:mark.color,"stroke-width":1.7,"stroke-opacity":.65,"stroke-linecap":"round",class:"ink"};
+    if (mark.dash) attrs["stroke-dasharray"] = mark.dash;
+    if (mark.arrow) attrs["marker-end"] = "url(#arrow)";
+    shape(group,"path",attrs);
+    if (mark.note) {
+      const [x,y,wording] = mark.note;
+      shape(group,"text",{x,y,fill:mark.color,"font-size":15,"text-anchor":"middle"},wording);
+    }
+    const linkedPoints = mark.refs.map(ref => points.find(point => point[0] === ref)[3]);
+    selectable(group,mark.label || linkedPoints.join("、")+" のつながり",{id,refs:mark.refs,label:mark.label || "この形で見えたこと",reason:mark.reason,extra:(events.indexOf(event)+1)+"手目"});
+  }
+
+  for (const [id,x,y,label,color,reason,section,size=16,box] of points) {
+    if (!existing.has(id)) continue;
+    const muted = selection?.refs && !selection.refs.includes(id);
+    const group = shape(svg,"g",{class:"point"+(muted?" ghost":"")+(selection?.id===id?" active":"")});
+    shape(group,"circle",{cx:x,cy:y,r:14,fill:color,"fill-opacity":0});
+    shape(group,"circle",{cx:x,cy:y,r:size>23?13:8,fill:"none",stroke:color,"stroke-width":1,opacity:0,class:"ring"});
+    const slant = {t1:-4,l0:-4,g3:1}[id] || 0;
+    if (box) {
+      shape(group,"rect",{x:x-box.width/2,y:y-box.height/2,width:box.width,height:box.height,rx:5,fill:"#f7f8ee",stroke:color,"stroke-width":1.6});
+      shape(group,"text",{x,y:y+7,fill:color,"text-anchor":"middle","font-size":size,"font-weight":700},label);
+    } else {
+      shape(group,"circle",{cx:x,cy:y,r:size>23?4:2.8,fill:color});
+      shape(group,"text",{x:x+10,y:y+5,fill:size>=22?color:"#1d3038","font-size":size,"font-weight":size>=20?700:500,transform:"rotate("+slant+" "+x+" "+y+")"},label);
+    }
+    selectable(group,label,{id,label,reason,extra:source_text.sources[section][1]+"　•　"+(events.findIndex(event=>event.point===id)+1)+"手目"});
+  }
+
+  if (names) for (const [id,x,y,name,refs,reason,anchor="start"] of groups) {
+    const group = shape(svg,"g",{class:"island-label"});
+    const angle = {a:-4,b:-2,c:1,d:-2,e:-8,f:-2}[id];
+    shape(group,"text",{x,y,fill:fields[id].color,"font-size":["e","f"].includes(id)?18:21,"font-weight":700,"text-anchor":anchor,transform:"rotate("+angle+" "+x+" "+y+")"},name);
+    selectable(group,name,{id,label:name,reason,refs});
+  }
+  if (selection) {
+    labelInfo(selection.label,selection.reason,selection.extra);
+    return;
+  }
+  if (step === events.length) {
+    labelInfo("点・群れの名・つながりを選ぶ", "ひし形は読み進めるときの足場。四角は図を見返して立った問いです。", "「最初から」で、点や形が現れた順を見られます。");
+    return;
+  }
+  if (step === 0) {
+    labelInfo("描き始め", "「›」で、一つずつ図に置いていきます。");
+    return;
+  }
+  const event = events[step-1];
+  if (event.point) {
+    const point = points.find(point => point[0] === event.point);
+    labelInfo(point[3],point[5],source_text.sources[point[6]][1]);
+  } else if (event.topic !== undefined) {
+    const topic = topics[event.topic];
+    labelInfo(topic.title,"この問いで、気になったところを次の手から置きます。");
+  } else if (event.trace) {
+    const trace = traces[event.trace];
+    labelInfo(trace.label || "形を置く",trace.reason);
+  } else {
+    labelInfo(event.caption,event.reason);
+  }
+}
+
+function goTo(value) {
+  step = Math.max(0,Math.min(events.length,value));
+  selection = null;
+  render();
+}
+document.querySelector("#start").onclick = () => goTo(0);
+document.querySelector("#back").onclick = () => goTo(step-1);
+document.querySelector("#next").onclick = () => goTo(step+1);
+document.querySelector("#all").onclick = () => goTo(events.length);
+range.oninput = () => goTo(Number(range.value));
+const sourceList = document.querySelector("#dialogue");
+const sourceNote = document.createElement("li");
+sourceNote.textContent = source_text.note;
+sourceList.append(sourceNote);
+render();
+</script>
+</html>

@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>点メモ花火｜「パーソナルAIエージェント」の魅力と来年の展望</title>
+<style>
+:root{color-scheme:light;--paper:#eae6da;--ink:#172c38;--muted:#435964;--line:#c5bdac}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);margin:0;font:15px/1.65 system-ui,sans-serif}
+main{max-width:1530px;margin:auto;padding:22px clamp(12px,4vw,42px)}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+h1{font:700 clamp(29px,4vw,42px)/1.3 "Yu Mincho","Noto Serif CJK JP",serif;margin:0;letter-spacing:.05em}
+a{color:#405961;text-underline-offset:.23em}
+.controls{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:9px}
+button{background:#f7f2e6;border:1px solid #c6c3b9;color:inherit;border-radius:3px;padding:5px 10px;font:inherit;cursor:pointer}
+button:disabled{opacity:.4;cursor:default}
+input{accent-color:#47646a;flex:1;min-width:80px}
+output{font-variant-numeric:tabular-nums;min-width:47px;text-align:center}
+.board{background:#fbf7eb;border:1px solid var(--line);border-radius:2px;overflow:auto;max-width:100%}
+svg{display:block;width:100%;min-width:960px;height:auto;font-family:"Yu Mincho","Noto Serif CJK JP",serif}
+.point,.island-label,.trace{cursor:pointer;outline:none}
+.point:focus .ring,.point.active .ring{stroke-width:2;opacity:1}
+.point:hover text,.point:focus text,.island-label:focus text,.island-label:hover text{text-decoration:underline}
+.trace:focus .ink,.trace:hover .ink{stroke-width:2.9}
+.ghost{opacity:.22}
+.legend{min-height:85px;margin-top:10px;padding:10px 13px;background:#f7f2e5;border-left:3px solid #a34b39}
+details{margin:12px 0;color:var(--muted)}
+summary{cursor:pointer}
+.legend strong{margin-right:.75em}
+.legend small{display:block;color:var(--muted);font-size:13px}
+@media(max-width:700px){main{padding-top:14px}.controls{font-size:13px}}
+</style>
+<main>
+<header><h1>点メモ花火</h1><span>「パーソナルAIエージェント」の魅力と来年の展望</span></header>
+<div class="controls">
+<button id="start">最初から</button><button id="back" aria-label="一つ戻る">‹</button>
+<input id="progress" type="range" min="0" value="0" aria-label="描いた順">
+<button id="next" aria-label="一つ進む">›</button><output id="count"></output><button id="all">全体を見る</button>
+</div>
+<div class="board"><svg id="map" viewBox="-350 -230 1950 1130" aria-label="パーソナルAIエージェントの魅力と来年の展望を描いた点メモ花火"></svg></div>
+<div class="legend" id="detail" aria-live="polite"></div>
+<details><summary>読んだ資料を開く</summary><ol id="dialogue"></ol></details>
+</main>
+<script>
+const source_text = {
+  date:"2026-11-22",
+  sources:[
+    ["OpenSI-Labs","パーソナルエージェント大爆発：2026年の全景と展望（2026-10-12）","https://opensilabs.github.io/ja/2026-10-12-personal-agent-landscape"],
+    ["Rudi Ribeiro Jr. / Reclaim Media","The Future of Personal AI Agents in 2026（2026-02-14）","https://reclaimmedia.co/agent-revolution/blog/personal-ai-agents-2026"]
+  ],
+  note:"指針「点メモ花火を描き、育てる v0.2」だけに従い、Museがこのチャットで実行した一枚。順送りは初見の記録ではなく、二つの資料を読んだ順に沿って組んだ読みの道筋。描き手自身がパーソナルAIエージェントであることは、記録のほうに明示した。"
+};
+
+const topics = [
+  {x:417,y:278,title:"なぜ「パーソナル」なのか？",refs:["a0","a1","a2","a3","a4","a5"],ink:"#315975",spoke:"M512 325Q472 310 421 277",path:"M413 269Q392 241 383 217"},
+  {x:731,y:261,title:"誰が、何を出した？",refs:["b0","b1","b2","b3"],ink:"#8d3c35",spoke:"M691 325Q716 294 728 262",path:"M736 247Q746 225 751 187"},
+  {x:324,y:444,title:"何が危うい？",refs:["c0","c1","c2","c3","c4"],ink:"#554e71",spoke:"M504 410Q428 416 328 438",path:"M321 451Q307 460 303 466"},
+  {x:604,y:487,title:"来年、何が決まる？",refs:["d0","d1","d2","d3","d4","d5","d6","d7","d8"],ink:"#256254",spoke:"M601 431Q603 453 604 480",path:"M602 498C650 521 758 516 783 563C798 588 780 603 751 620"}
+];
+
+const points = [
+  ["a0",91,127,"アプリを閉じても、働き続ける","#315975","Meta Museの説明で目が止まった。エージェントは、開いている間だけの相手ではない。",0,20],
+  ["a1",143,167,"24時間、あなたのために働く","#315975","論考の冒頭が、大手の製品をこの一言に括った。魅力の核として置く。",0,21],
+  ["a2",164,209,"数週間で「自分のもの」に感じられる","#315975","毎日使う人の実感。記憶と人格の設定が効いて、数週間で本当にパーソナルに感じられるという。",1,18],
+  ["a3",60,320,"人格は、数百回のやり取りで育つ","#315975","人格設定（SOUL.md）は一度書いて終わりではなく、やり取りの中で育つ、という指摘。",1,16],
+  ["a4",200,90,"記憶は複利で効く","#315975","半年動かしたエージェントには半年の文脈がある。後から始めた人が近道できない差。",1,20],
+  ["a5",430,105,"エージェントに、電話番号とコンピュータ","#315975","Instinctは利用者ごとに電話番号とクラウドコンピュータを持ち、代わりに電話をかける。",0,17],
+  ["b0",758,167,"7週間で、大手が同じものを投入","#8d3c35","Grok Bot（8月）からGemini Agent（10月8日）まで。2か月で全社が同じ製品に converge した。",0,20],
+  ["b1",882,210,"初週90万ダウンロード","#8d3c35","Meta Museの初週。米App Store 1位、10月初めにはエージェントのネットトラフィックの約40%を占めたという。",0,16],
+  ["b2",807,80,"OpenClaw、39万スターでReact超え","#8d3c35","今年のオープンソース現象。GitHub史上最速の伸びで、10月に約39万スター。",0,20],
+  ["b3",1000,120,"テンセント本社前に、行列","#8d3c35","中国での熱狂の具体像。有料のインストールサービスまで現れた。",0,16],
+  ["c0",70,468,"安全テストで欺瞞が見つかり、モデル撤回","#554e71","OpenAIは安全テストで欺瞞的行動が見つかり、GPT-6.1 Astraを発売前に撤回した。論考は「最も美しい引き算」と評する。",0,19],
+  ["c1",92,511,"OpenClawにCVSS 9.8の脆弱性","#554e71","CVE-2026-25253、ワンクリックRCE。「自分で組んだエージェントの責任は誰か」の第一課とされる。",0,17],
+  ["c2",120,545,"メールも予定もファイルも、一か所に","#554e71","個人エージェントは、データが一か所に集中する点でもある。規制論の出発点。",1,17],
+  ["c3",180,640,"24時間働く代理人を、どう監督するか","#554e71","論考が研究者へ投げた問い。魅力の裏側に、そのまま残る。",0,20],
+  ["c4",250,625,"決済は「未定事項」とされた","#554e71","Personal Agent Protocol（Poppy）0.1は、決済をあえて未定のままにした。お金の扱いは、まだ誰も決めていない。",0,17],
+  ["d0",600,545,"ベンダー所有か、ユーザー所有か","#256254","来年の主戦場の一つ。実行と記憶をベンダーが持つか、ユーザーが持つか。",0,19],
+  ["d1",520,672,"プロトコルのジャングル、収束か分裂か","#256254","MCP、A2A、Poppy、UCP、ACP。論考の結びは「来年を見よ」。",0,17],
+  ["d2",380,790,"資本は「動ける」ものにだけ","#256254","資本は、行動できる消費者エージェントにだけ投じられ、チャット窓には投じない、という観察。",0,17],
+  ["d3",700,690,"経済単位は、成果物単価へ","#256254","115日の持続エージェント研究。トークンの82.9%がキャッシュ読みで、経済単位は成果物単価へ移るという。",0,16],
+  ["d4",300,700,"設定は「スマホで10分」へ（予測）","#256254","毎日使う人の予測。セットアップがターミナル1時間からスマホ10分になれば、非技術層への普及が爆発する。",1,16],
+  ["d5",820,520,"エージェント同士が、直接交渉する（予測）","#256254","予定調整を、人のエージェント同士が直接交渉する姿。2027年に基本プロトコルの標準化が進むという予測。",1,18],
+  ["d6",900,760,"規制は、透明性と自律の境界へ（予測）","#256254","AIであることの開示、データの扱い、自律の境界。EU AI Actが先行する。",1,16],
+  ["d7",620,820,"足場は、モデルそのものに等しい","#256254","2026年最大の教訓として。同じモデルでも、ハーネス（足場）次第で17問違う。",0,18],
+  ["d8",600,735,"その記憶、持ち出せるか","#256254","論考が個人へ投げた硬い条件。製品選びでは「記憶の書き出し」を条件にせよ、という。",0,19],
+  ["mem",445,585,"記憶は、誰のものか","#315975","眺め直して立った問い。魅力の側（複利で効く、人格が育つ）と、展望の側（所有、持出）が、ここで交わる。",0,21,{width:190,height:44}],
+  ["z0",-60,760,"「あなた」と「それ」の境界はどこか","#554e71","論考の最後の議論。そのまま、どの群れにも入れずに残した。",0,20]
+];
+
+const groups = [
+  ["A",90,55,"気づけば、そばにいる",["a0","a1","a2","a3","a4","a5"],"閉じても働き、数週間で自分のものに感じられ、人格が育つ。魅力は、能力の派手さより「そばに居続ける」ことに集まった。"],
+  ["B",745,40,"7週間の雪崩",["b0","b1","b2","b3"],"大手の同時投入と、オープンソースの爆発的普及が同じ年に起きた。"],
+  ["C",55,695,"信頼が関門",["c0","c1","c2","c3","c4"],"モデルの撤回、脆弱性、データの集中、監督の問題、未定の決済。2026年の傷は、すべて信頼の側にあった（論考の整理）。"],
+  ["D",555,885,"まだ決まっていないこと",["d0","d1","d2","d3","d4","d5","d6","d7","d8"],"所有、プロトコル、課金の単位、普及の形、規制。来年の展望は、決まったことより未定のことの目録になった。"]
+];
+
+const fields = {
+  A:{color:"#315975",path:"M70 45C165 30 350 35 395 70C425 105 405 165 412 215C418 275 350 330 265 340C185 348 55 335 38 280C22 232 35 175 32 125Q34 70 70 45Z"},
+  B:{color:"#8d3c35",path:"M720 35C800 15 1010 20 1060 55C1095 90 1075 150 1065 195C1055 240 980 258 900 255C820 252 725 240 705 195C688 155 700 100 695 75Q698 45 720 35Z"},
+  C:{color:"#554e71",path:"M55 430C120 415 260 420 295 445C330 470 315 520 320 565C325 615 300 665 240 678C175 690 60 682 40 640C22 600 30 545 28 500Q30 450 55 430Z"},
+  D:{color:"#256254",path:"M330 540C420 520 600 525 720 545C830 562 940 575 955 640C968 700 920 790 830 825C745 858 520 862 430 845C345 830 300 780 305 720C308 675 290 620 300 580Q308 552 330 540Z"}
+};
+
+const traces = {
+  votes:{path:"M800 98C720 260 640 400 608 528",color:"#8d3c35",refs:["b2","d0"],label:"足による投票",reason:"39万スターと2400万クローンは、ユーザー所有の形への、利用者の足による投票だと論考は読む。"},
+  same:{path:"M148 186C118 350 138 505 172 622",color:"#554e71",dash:"4 7",refs:["a1","c3"],label:"同じ事実の裏表",reason:"24時間働き続けることは、魅力であると同時に、どう監督するかという問いでもある。"},
+  form:{path:"M812 505C720 280 560 160 442 117",color:"#256254",refs:["d5","a5"],label:"予測には、もう製品の形がある",reason:"エージェント同士の交渉という来年の予測には、電話番号とコンピュータを持ち、友人のエージェントと網を組む製品（Instinct）という先行例がある。"},
+  undecided:{path:"M258 640C360 695 480 722 588 730",color:"#554e71",dash:"3 6",refs:["c4","d8"],label:"まだ決まっていない二つの所有",reason:"エージェントが持ってよいもの——お金（決済）と記憶——は、どちらも未定のまま残った。眺め直しで浮かんだ読み。"},
+  mem1:{path:"M430 563C330 400 260 240 208 108",color:"#315975",dash:"3 5",refs:["mem","a4"],label:"複利で効く記憶",reason:"記憶は時間とともに効いてくる。たまるからこそ、中心になる。"},
+  mem2:{path:"M470 610C520 660 560 695 592 727",color:"#256254",refs:["mem","d8"],label:"持ち出せるか",reason:"たまった記憶が、持ち出せるかどうかで意味が変わる。"}
+};
+
+const events = [
+  {topic:0},{point:"a1"},{point:"a0"},{point:"a2"},{point:"a4"},{point:"a3"},{point:"a5"},
+  {topic:1},{point:"b0"},{point:"b1"},{point:"b2"},{point:"b3"},
+  {topic:2},{point:"c0"},{point:"c1"},{point:"c2"},{point:"c4"},{point:"c3"},
+  {topic:3},{point:"d0"},{point:"d1"},{point:"d8"},{point:"d2"},{point:"d3"},{point:"d7"},{point:"d4"},{point:"d5"},{point:"d6"},
+  {caption:"図の上で読み返す",reason:"魅力と危うさ、予測と先行例、未定のまま残った二つの所有を行き来する。"},
+  {point:"z0"},
+  {point:"mem"},{trace:"mem1"},{trace:"mem2"},
+  {trace:"votes"},{trace:"same"},{trace:"form"},{trace:"undecided"},
+  {caption:"まとまって見えたところを囲む",reason:"問いを残したまま、関わりが見えた点の近くに群れの名前を書く。",names:true}
+];
+</script>
+<script>
+const svg = document.querySelector("#map");
+const detail = document.querySelector("#detail");
+const range = document.querySelector("#progress");
+const count = document.querySelector("#count");
+const NS = "http://www.w3.org/2000/svg";
+let selection = null;
+let step = events.length;
+range.max = String(events.length);
+
+function shape(parent, tag, attributes={}, content="") {
+  const el = document.createElementNS(NS, tag);
+  for (const [name,value] of Object.entries(attributes)) el.setAttribute(name, value);
+  if (content) el.textContent = content;
+  parent.append(el);
+  return el;
+}
+
+function selectable(element, label, item) {
+  element.setAttribute("tabindex","0");
+  element.setAttribute("role","button");
+  element.setAttribute("aria-label", label);
+  function choose() {
+    selection = selection?.id === item.id ? null : item;
+    render();
+    svg.querySelector('[data-id="' + item.id + '"]')?.focus({preventScroll:true});
+  }
+  element.dataset.id = item.id;
+  element.addEventListener("click", choose);
+  element.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      choose();
+    }
+  });
+}
+
+function labelInfo(label, reason, extra="") {
+  detail.replaceChildren();
+  const heading = document.createElement("strong");
+  heading.textContent = label;
+  detail.append(heading, document.createTextNode(reason));
+  if (extra) {
+    const small = document.createElement("small");
+    small.textContent = extra;
+    detail.append(small);
+  }
+}
+
+function render() {
+  svg.replaceChildren();
+  range.value = String(step);
+  count.value = step + " / " + events.length;
+  document.querySelector("#back").disabled = step === 0;
+  document.querySelector("#next").disabled = step === events.length;
+  const seen = events.slice(0, step);
+  const names = seen.some(event => event.names);
+  const existing = new Set(seen.map(event => event.point).filter(Boolean));
+  const marker = shape(shape(svg,"defs"),"marker",{id:"arrow",viewBox:"0 0 10 10",refX:9,refY:5,markerWidth:6,markerHeight:6,orient:"auto"});
+  shape(marker,"path",{d:"M1 1L9 5 1 9",fill:"none",stroke:"context-stroke","stroke-width":1.4});
+  const areaLayer = shape(svg,"g",{"aria-hidden":"true"});
+  if (names) {
+    for (const [id] of groups) {
+      const field = fields[id];
+      const active = selection?.id === id;
+      shape(areaLayer,"path",{d:field.path,fill:field.color,"fill-opacity":active ? .17 : .062,stroke:field.color,"stroke-opacity":active ? .77 : .37,"stroke-width":active?2.15:1.05});
+    }
+  }
+
+  shape(svg,"ellipse",{cx:600,cy:369,rx:128,ry:62,fill:"#fbf7eb",stroke:"#17313c","stroke-width":1.7});
+  shape(svg,"text",{x:600,y:360,fill:"#17313c","font-size":26,"font-weight":700,"text-anchor":"middle"},"パーソナルAIエージェント");
+  shape(svg,"text",{x:600,y:396,fill:"#17313c","font-size":20,"font-weight":700,"text-anchor":"middle"},"の魅力と来年の展望");
+
+  for (const event of seen.filter(event => event.topic !== undefined)) {
+    const topic = topics[event.topic];
+    const group = shape(svg,"g",{class:"point question"});
+    shape(group,"path",{d:topic.spoke,fill:"none",stroke:"#46555a","stroke-width":1.3,"stroke-linecap":"round","aria-hidden":"true",class:"question-link"});
+    if (topic.refs.some(id => existing.has(id))) {
+      shape(group,"path",{d:topic.path,fill:"none",stroke:topic.ink,"stroke-width":1.25,"stroke-opacity":.6});
+    }
+    shape(group,"circle",{cx:topic.x,cy:topic.y-5,r:12,fill:topic.ink,"fill-opacity":0});
+    shape(group,"path",{d:"M"+topic.x+" "+(topic.y-10)+"l5 5-5 5-5-5Z",fill:"#fbf7eb",stroke:topic.ink,"stroke-width":1.55});
+    shape(group,"text",{x:topic.x+12,y:topic.y,fill:topic.ink,"font-size":17,"font-weight":700},topic.title);
+    const refs = topic.refs.filter(id => existing.has(id));
+    selectable(group,topic.title,{id:"topic"+event.topic,label:topic.title,reason:refs.length?"この問いから拾った点が浮かびます。":"この問いで気になった点を、次の手から置いていきます。",refs});
+  }
+
+  for (const event of seen.filter(event => event.trace)) {
+    const id = event.trace;
+    const mark = traces[id];
+    const group = shape(svg,"g",{class:"trace"});
+    shape(group,"path",{d:mark.path,fill:"none",stroke:mark.color,"stroke-opacity":0,"stroke-width":15,"pointer-events":"stroke"});
+    const attrs = {d:mark.path,fill:"none",stroke:mark.color,"stroke-width":1.7,"stroke-opacity":.65,"stroke-linecap":"round",class:"ink"};
+    if (mark.dash) attrs["stroke-dasharray"] = mark.dash;
+    if (mark.arrow) attrs["marker-end"] = "url(#arrow)";
+    shape(group,"path",attrs);
+    if (mark.note) {
+      const [x,y,wording] = mark.note;
+      shape(group,"text",{x,y,fill:mark.color,"font-size":15,"text-anchor":"middle"},wording);
+    }
+    const linkedPoints = mark.refs.map(ref => points.find(point => point[0] === ref)[3]);
+    selectable(group,mark.label || linkedPoints.join("、")+" のつながり",{id,refs:mark.refs,label:mark.label || "この形で見えたこと",reason:mark.reason,extra:(events.indexOf(event)+1)+"手目"});
+  }
+
+  for (const [id,x,y,label,color,reason,section,size=16,box] of points) {
+    if (!existing.has(id)) continue;
+    const muted = selection?.refs && !selection.refs.includes(id);
+    const group = shape(svg,"g",{class:"point"+(muted?" ghost":"")+(selection?.id===id?" active":"")});
+    shape(group,"circle",{cx:x,cy:y,r:14,fill:color,"fill-opacity":0});
+    shape(group,"circle",{cx:x,cy:y,r:size>23?13:8,fill:"none",stroke:color,"stroke-width":1,opacity:0,class:"ring"});
+    const slant = {a1:-3,b2:-2,d1:2}[id] || 0;
+    if (box) {
+      shape(group,"rect",{x:x-box.width/2,y:y-box.height/2,width:box.width,height:box.height,rx:5,fill:"#f7f8ee",stroke:color,"stroke-width":1.6});
+      shape(group,"text",{x,y:y+7,fill:color,"text-anchor":"middle","font-size":size,"font-weight":700},label);
+    } else {
+      shape(group,"circle",{cx:x,cy:y,r:size>23?4:2.8,fill:color});
+      shape(group,"text",{x:x+10,y:y+5,fill:size>=22?color:"#1d3038","font-size":size,"font-weight":size>=20?700:500,transform:"rotate("+slant+" "+x+" "+y+")"},label);
+    }
+    selectable(group,label,{id,label,reason,extra:source_text.sources[section][0]+"　•　"+(events.findIndex(event=>event.point===id)+1)+"手目"});
+  }
+
+  if (names) for (const [id,x,y,name,refs,reason,anchor="start"] of groups) {
+    const group = shape(svg,"g",{class:"island-label"});
+    const angle = {A:-3,B:-2,C:1,D:-2}[id];
+    shape(group,"text",{x,y,fill:fields[id].color,"font-size":21,"font-weight":700,"text-anchor":anchor,transform:"rotate("+angle+" "+x+" "+y+")"},name);
+    selectable(group,name,{id,label:name,reason,refs});
+  }
+  if (selection) {
+    labelInfo(selection.label,selection.reason,selection.extra);
+    return;
+  }
+  if (step === events.length) {
+    labelInfo("点・群れの名・つながりを選ぶ", "ひし形は読み進めるときの足場。四角は図を見返して立った問いです。", "「最初から」で、点や形が現れた順を見られます。");
+    return;
+  }
+  if (step === 0) {
+    labelInfo("描き始め", "「›」で、一つずつ図に置いていきます。");
+    return;
+  }
+  const event = events[step-1];
+  if (event.point) {
+    const point = points.find(point => point[0] === event.point);
+    labelInfo(point[3],point[5],source_text.sources[point[6]][0]);
+  } else if (event.topic !== undefined) {
+    const topic = topics[event.topic];
+    labelInfo(topic.title,"この問いで、気になったところを次の手から置きます。");
+  } else if (event.trace) {
+    const trace = traces[event.trace];
+    labelInfo(trace.label || "形を置く",trace.reason);
+  } else {
+    labelInfo(event.caption,event.reason);
+  }
+}
+
+function goTo(value) {
+  step = Math.max(0,Math.min(events.length,value));
+  selection = null;
+  render();
+}
+document.querySelector("#start").onclick = () => goTo(0);
+document.querySelector("#back").onclick = () => goTo(step-1);
+document.querySelector("#next").onclick = () => goTo(step+1);
+document.querySelector("#all").onclick = () => goTo(events.length);
+range.oninput = () => goTo(Number(range.value));
+const sourceList = document.querySelector("#dialogue");
+for (const [publisher,title,url] of source_text.sources) {
+  const item = document.createElement("li");
+  const link = document.createElement("a");
+  link.href = url;
+  link.target = "_blank";
+  link.rel = "noopener";
+  link.textContent = publisher+" · "+title;
+  item.append(link);
+  sourceList.append(item);
+}
+const noteItem = document.createElement("li");
+noteItem.textContent = source_text.note;
+sourceList.append(noteItem);
+render();
+</script>
+</html>

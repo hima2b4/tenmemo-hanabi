@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>点メモ花火｜ゴジラ-1.0 が与えた影響</title>
+<style>
+:root{color-scheme:light;--paper:#eae6da;--ink:#172c38;--muted:#435964;--line:#c5bdac}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);margin:0;font:15px/1.65 system-ui,sans-serif}
+main{max-width:1530px;margin:auto;padding:22px clamp(12px,4vw,42px)}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+h1{font:700 clamp(29px,4vw,42px)/1.3 "Yu Mincho","Noto Serif CJK JP",serif;margin:0;letter-spacing:.05em}
+a{color:#405961;text-underline-offset:.23em}
+.controls{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:9px}
+button{background:#f7f2e6;border:1px solid #c6c3b9;color:inherit;border-radius:3px;padding:5px 10px;font:inherit;cursor:pointer}
+button:disabled{opacity:.4;cursor:default}
+input{accent-color:#47646a;flex:1;min-width:80px}
+output{font-variant-numeric:tabular-nums;min-width:47px;text-align:center}
+.board{background:#fbf7eb;border:1px solid var(--line);border-radius:2px;overflow:auto;max-width:100%}
+svg{display:block;width:100%;min-width:960px;height:auto;font-family:"Yu Mincho","Noto Serif CJK JP",serif}
+.point,.island-label,.trace{cursor:pointer;outline:none}
+.point:focus .ring,.point.active .ring{stroke-width:2;opacity:1}
+.point:hover text,.point:focus text,.island-label:focus text,.island-label:hover text{text-decoration:underline}
+.trace:focus .ink,.trace:hover .ink{stroke-width:2.9}
+.ghost{opacity:.22}
+.legend{min-height:85px;margin-top:10px;padding:10px 13px;background:#f7f2e5;border-left:3px solid #a34b39}
+details{margin:12px 0;color:var(--muted)}
+summary{cursor:pointer}
+.legend strong{margin-right:.75em}
+.legend small{display:block;color:var(--muted);font-size:13px}
+@media(max-width:700px){main{padding-top:14px}.controls{font-size:13px}}
+</style>
+<main>
+<header><h1>点メモ花火</h1><span>ゴジラ-1.0 が与えた影響</span></header>
+<div class="controls">
+<button id="start">最初から</button><button id="back" aria-label="一つ戻る">‹</button>
+<input id="progress" type="range" min="0" value="0" aria-label="描いた順">
+<button id="next" aria-label="一つ進む">›</button><output id="count"></output><button id="all">全体を見る</button>
+</div>
+<div class="board"><svg id="map" viewBox="-350 -230 1950 1130" aria-label="ゴジラ-1.0 が与えた影響を描いた点メモ花火"></svg></div>
+<div class="legend" id="detail" aria-live="polite"></div>
+<details><summary>読んだ資料を開く</summary><ol id="dialogue"></ol></details>
+</main>
+<script>
+const source_text = {
+  date:"2026-11-22",
+  sources:[
+    ["東宝・Godzilla Official","米国公開と北米の白黒版上映","https://godzilla.com/en-gb/blogs/news/godzilla-minus-one-wins-academy-award-for-best-visual-effects"],
+    ["Box Office Mojo","『ゴジラ-1.0』劇場興収","https://www.boxofficemojo.com/title/tt23289160/"],
+    ["米国映画芸術科学アカデミー","第96回視覚効果賞","https://www.oscars.org/oscars/ceremonies/2024"],
+    ["Autodesk AREA JAPAN","白組への制作インタビュー","https://area.autodesk.jp/case/movie_tv/godzilla-minus-one/"],
+    ["BFI・Sight and Sound","戦後の暮らしと生き残った者の罪悪感を読む批評","https://www.bfi.org.uk/sight-and-sound/reviews/godzilla-minus-one-70-year-old-titan-terror-returns-some-spectacular-city-stomping"],
+    ["RogerEbert.com","敷島の生き残った者としての罪悪感を論じる批評","https://www.rogerebert.com/reviews/godzilla-minus-one-movie-review-2023"],
+    ["GKIDS","『ゴジラ-0.0』の北米配給と、IMAX向け撮影の発表","https://gkids.com/2026/04/14/toho-and-gkids-reveal-first-teaser-for-godzilla-minus-zero/"],
+    ["Box Office Mojo","『ゴジラ-0.0』の日米公開日","https://www.boxofficemojo.com/releasegroup/gr678712069/"],
+    ["東宝・担当者インタビュー","世界同時期公開の舞台裏と、前作から引き継いだもの","https://www.toho.co.jp/our-moments/2026/11/8.html"],
+    ["日本アカデミー賞協会","第47回の最優秀作品賞・脚本賞・技術賞","https://japan-academy-prize.jp/prizes/list/47"],
+    ["東宝","続編初日発表で振り返った前作興収","https://www.toho.co.jp/our-moments/2026/11/godzilla-minuszero-20261103.html"],
+    ["IMAGICA EMS","英語字幕、上映素材と北米での劇場配給支援","https://www.imagica-ems.co.jp/en/newsroom/godzilla_minus_one-231212/"],
+    ["東宝・決算説明会","北米初の自社配給、二次利用権、Netflix契約","https://www.toho.co.jp/files/bcbf97bfae89b2b63099264ed9bd6f4561d96a998a4c6056d6afac5bc90efc6e"],
+    ["東宝・決算説明会","GKIDS買収検討の経緯、北米配給の方針と『国宝』","https://www.toho.co.jp/files/9ff76bb6b39c1d20a94eb51b0ddd16ebf801e8688cebc115ce8d104f1db5a0bd"],
+    ["GKIDS","『国宝』の北米配給","https://gkids.com/films/kokuho/"],
+    ["Animation World Network","白組・渋谷紀世子が語る、水や建物を描く仕事","https://www.awn.com/vfxworld/godzilla-minus-one-breathes-new-life-iconic-kaiju"]
+  ]
+};
+
+const topics = [
+  {x:417,y:278,title:"どこまで届いた？",refs:["m0","m1","m2"],ink:"#315975",spoke:"M512 325Q472 310 421 277",path:"M413 269Q392 241 383 217"},
+  {x:731,y:261,title:"何が評価された？",refs:["v0","v1","j0","j1","j2"],ink:"#8d3c35",spoke:"M691 325Q716 294 728 262",path:"M736 247Q746 225 751 187"},
+  {x:752,y:403,title:"どんな現場が見えてきた？",refs:["w0","w1","w2","s0","s1","s2"],ink:"#8d3c35",spoke:"M724 382Q735 389 747 397",path:"M759 410Q774 427 798 436"},
+  {x:324,y:444,title:"どんな映画として読まれた？",refs:["h0","h1","h2"],ink:"#554e71",spoke:"M504 410Q428 416 328 438",path:"M321 451Q307 460 303 466"},
+  {x:604,y:487,title:"次の作品で何が変わった？",refs:["n0","n1","n2","n3","n4","publish","schedule"],ink:"#256254",spoke:"M601 431Q603 453 604 480",path:"M602 498C650 521 758 516 783 563C798 588 780 603 751 620"},
+  {x:213,y:357,title:"配給に何が残った？",refs:["a0","a1","a2","a3","a4","b0","b1","b2","b3"],ink:"#3c6460",spoke:"M472 366Q345 372 217 353",path:"M206 353Q115 339 43 298C12 281 -4 259 -20 236"}
+];
+
+const points = [
+  ["m0",91,127,"米国公開　12月1日","#315975","日本公開は2023年11月3日。米国での一般公開は約４週間後の12月1日。",0,21],
+  ["m1",143,167,"白黒版まで劇場に","#315975","北米で白黒版が１週間上映されたのは2024年1月。視覚効果賞の受賞より先に、別バージョンも劇場へ届いていた。",0,22],
+  ["m2",164,209,"北米 約5,710万ドル","#315975","Box Office Mojoの全リリース合計では、米国・カナダの興収は約5,714万ドル。",1,20],
+  ["v0",758,167,"アカデミー視覚効果賞","#8d3c35","2024年3月、同作が視覚効果賞を受賞。ここで認められたのは作品の視覚効果。",2,24],
+  ["v1",882,210,"山崎・渋谷・髙橋・野島","#8d3c35","山崎貴、渋谷紀世子、髙橋正紀、野島達司の４名が受賞者として記録されている。",2,15],
+  ["w0",807,451,"白組・同じフロア","#8d3c35","監督を含むアーティストが同じフロアで作業。白組の当事者が制作体制を語っている。",3,21],
+  ["w1",855,501,"OKのあとも手を入れる","#8d3c35","監督の了承後も、別のアーティストの意見や自分で気づいた箇所を取り入れて修正したという。",3,18],
+  ["w2",890,543,"角度を提案し、大きさを探る","#8d3c35","大きく見えないときは、アーティストもカメラ角度を提案し、対話しながら探した。制作上の具体例。",3,16],
+  ["h0",70,468,"生き残った者の罪悪感","#554e71","BFIの批評では、主人公・敷島が抱える罪悪感と、戦後日本の再出発に着目している。",4,21],
+  ["h1",92,511,"焼け跡で家族をつくる","#554e71","BFIの批評は、東京の復興のなかで敷島が家族を見つける過程をたどった。",4,18],
+  ["h2",131,558,"もう一度生きる","#554e71","RogerEbert.comの批評にも敷島の生き残った者としての罪悪感と、生き直そうとする姿が現れる。",5,21],
+  ["n0",493,553,"続編に敷島たちが戻る","#256254","『ゴジラ-0.0』でも神木隆之介・浜辺美波が再演。前作の２年後を描く。",6,18],
+  ["n1",525,590,"日本作品初のIMAX向け撮影","#256254","配給元GKIDSによる発表。続編で初めて日本の作品が「Filmed For IMAX」として制作された。",6,17],
+  ["n2",339,652,"日本公開から３日で北米へ","#256254","続編は2026年11月3日に日本、11月6日に北米公開。前作の日本から米国までの約４週間と並べて読んだ。",7,20],
+  ["n3",409,746,"企画段階から海外展開","#256254","東宝のプロデューサーによると、続編は企画段階から海外展開を決め、海外チームと撮影日程も組んだ。関係者は前作の海外でのヒットを、実写邦画を広げる機会として捉えていた。",8,16],
+  ["n4",821,614,"合言葉、半紙から監督の椅子へ","#256254","東宝のプロデューサーによると、前作では音響チームが半紙に書いて監督の前に貼った「世界が待ってる」を、続編では監督の椅子の背に刻んだ。",8,17],
+  ["publish",680,643,"世界同時期公開","#256254","『ゴジラ-0.0』では世界同時期公開を目指し、各国の公開曜日の違いを踏まえ、日本公開から１週間以内を目安に展開したと東宝のプロデューサーは語る。",8,23],
+  ["schedule",760,746,"海外チームと撮影日程を組む","#256254","東宝のプロデューサーは、各国で同時期に届けるために製作に何が必要かを海外チームと詰め、撮影スケジュールを組んだと語る。",8,18],
+  ["j0",426,-107,"国内興収 76.5億円突破","#794c34","東宝は2026年11月3日の続編初日資料で、前作の興行収入が76.5億円を超えたと紹介している。",10,21],
+  ["j1",452,-53,"日本アカデミー賞 最優秀作品賞","#794c34","第47回、2024年3月8日。国内の評価は作品賞にも現れた。",9,19],
+  ["j2",560,-10,"脚本・撮影・照明にも最優秀賞","#794c34","同じ賞の受賞一覧で、作品賞に加えて脚本、撮影、照明などの最優秀賞も確認できる。",9,17],
+  ["s0",1220,285,"VFXは35人のチーム","#8d3c35","Autodeskの当事者インタビューでは、35人の制作体制について尋ね、同じフロアでの仕事を掘り下げている。人数はVFX制作で、映画全体の人数ではない。",3,20],
+  ["s1",1240,345,"実写の波と、CGの大波を合わせる","#8d3c35","渋谷紀世子によると、木造船の実写で撮れた波と、ゴジラが生む大きなCGの波の質を同じ画面内で合わせるのが難所だった。",15,16],
+  ["s2",1247,416,"壊れる建物は、壁の厚みも作る","#8d3c35","渋谷紀世子は、破壊される建物のモデルに素材の厚みや内壁の構造まで持たせたと説明する。",15,17],
+  ["a0",-302,-62,"北米で初の自社配給","#3c6460","東宝の説明では、本作が北米で同社が劇場配給を自ら担った最初の例。自社配給にも、字幕制作や上映館のブッキングを支える外部の仕事があった。",12,22],
+  ["a1",-277,-10,"英語字幕版を制作","#3c6460","IMAGICA EMSが北米公開用の英語字幕版を制作した。",11,18],
+  ["a2",-267,43,"2,000超のスクリーンを手配支援","#3c6460","Pixelogicは東宝の米国子会社と連携し、2,000を超えるスクリーンのブッキングを支援したと報告。ブッキング支援数。",11,16],
+  ["a3",-292,124,"二次利用権も手元に","#3c6460","東宝によれば、北米で配給を自ら担ったことで、北米の二次利用権も保持した。",12,21],
+  ["a4",-271,184,"日本を除く配信をNetflixへ","#3c6460","東宝によると、北米でのヒットと視覚効果賞のあと複数の配信事業者から打診があり、日本を除く地域の配信契約をNetflixと結んだ。個別の契約額は非公表。",12,17],
+  ["b0",-292,495,"自社配給を進めるさなかに、買収検討","#4a676b","東宝は、本作の北米公開をToho Internationalで進めていた時期に、GKIDSの買収を検討し始めたと説明している。",13,15],
+  ["b1",-279,545,"北米の劇場配給は原則GKIDSへ","#4a676b","買収後、東宝は北米劇場配給を原則GKIDS主導とする方針を説明した。",13,18],
+  ["b2",-264,596,"自社配給を経験した人も移す方針","#4a676b","東宝はToho Internationalで劇場配給を経験した担当者をGKIDSに移す方針も示した。移籍完了の確認とは区別した。",13,16],
+  ["b3",-229,667,"『国宝』もGKIDSが北米配給","#4a676b","GKIDSは『国宝』を同社初の現代実写新作と位置づけている。前作単独の効果としてではなく、受け皿が別の実写作品にも使われた例として置いた。",14,18]
+];
+
+const groups = [
+  ["a",94,99,"賞の知らせより先に、劇場へ",["m0","m1","m2"],"白黒版の上映日を受賞日と並べて見えた群れ。北米興収は全リリース合計なので、その全額が受賞前と読むことはできない。"],
+  ["b",787,104,"作った人の名前が表に出る",["v0","v1","w0","w1","w2"],"受賞者の名前から制作側の話へ戻ると、画の角度や修正を人がどう決めたかが具体的になる。作り方が受賞の原因だったかは、この資料からは判断できない。"],
+  ["c",78,605,"怪獣の向こうに、戦後の暮らし",["h0","h1","h2"],"英国と米国の批評を並べると、戦後を生きる人間に目を向ける読みが見える。観客全体の受け止め方は別途確認が必要。"],
+  ["d",555,814,"世界に届ける前提で、作り始める",["n0","n1","n2","n3","n4","publish","schedule"],"物語や合言葉を引き継ぎ、続編では企画段階から海外公開を想定。東宝担当者は前作のヒットを機会と捉えたと語る。賞だけで個々の判断を説明することはできない。"],
+  ["e",448,-167,"国内では、作品そのものにも賞",["j0","j1","j2"],"国内興収と国内の評価を並べ、米国の視覚効果賞と評価の対象を見比べる。"],
+  ["f",1213,222,"画面の中に、現場の判断がある",["s0","s1","s2","w2"],"波の質や壁の厚みという具体に制作の話を戻す。受賞を説明するための因果関係としては扱わない。"],
+  ["g",-306,-115,"劇場に届け、権利も手元に",["a0","a1","a2","a3","a4"],"自社配給を名義だけで見ず、字幕・劇場手配という実務と、二次利用権という事業上の変化を見比べる。"],
+  ["h",-294,442,"配給を経験した人と、次の受け皿",["b0","b1","b2","b3"],"東宝が語る自社配給期の経験、GKIDS主導への判断、担当者の移管方針と、次の実写作品を並べる。"]
+
+];
+
+const fields = {
+  a:{color:"#315975",path:"M91 66C165 49 344 55 389 88C421 119 395 174 412 215C420 265 358 285 300 303C242 322 88 320 57 282C25 240 47 188 42 142Q42 93 91 66Z"},
+  b:{color:"#8d3c35",path:"M794 79C865 57 1112 57 1150 98C1178 142 1148 223 1111 250C1078 284 1078 334 1133 395C1191 465 1181 540 1126 572C1056 602 859 596 826 561C794 535 800 495 778 462C748 428 772 390 804 353C857 300 864 278 813 244C751 220 722 199 728 157Q738 106 794 79Z"},
+  c:{color:"#554e71",path:"M70 433C116 420 229 426 267 438C318 446 350 459 350 500C341 524 329 550 357 566C394 592 355 622 291 630C224 642 77 638 45 603C20 577 28 518 37 486Q40 449 70 433Z"},
+  d:{color:"#256254",path:"M496 530C556 516 656 527 717 553C771 573 848 568 933 585C1046 603 1128 606 1146 663C1178 714 1138 771 1074 803C1019 835 797 840 698 844C584 858 452 843 399 812C352 782 377 757 345 727C310 697 304 659 334 634C352 618 436 605 446 574Q456 548 496 530Z"},
+  e:{color:"#9a6747",path:"M398 -186C465 -218 743 -215 833 -180C895 -150 856 -69 904 -41C931 -13 881 30 819 29C750 28 638 13 564 30C500 43 407 20 395 -44C375 -104 355 -151 398 -186Z"},
+  f:{color:"#985340",path:"M1201 207C1273 174 1521 180 1565 218C1599 253 1572 308 1570 348C1568 382 1586 448 1534 472C1427 497 1218 485 1197 440C1177 402 1176 338 1190 310C1207 274 1172 244 1201 207Z"},
+  g:{color:"#3c6460",path:"M-310 -143C-273 -162 -29 -145 -5 -109C37 -74 13 -26 27 15C46 45 24 97 16 123C13 166 22 219 -30 235C-120 255 -288 245 -311 208C-339 169 -319 127 -328 87C-332 53 -327 -4 -329 -50Q-335 -104 -310 -143Z"},
+  h:{color:"#4a676b",path:"M-313 417C-272 392 -32 392 -14 429C20 457 -1 506 9 560C22 620 19 678 -27 704C-102 738 -283 717 -311 671C-327 639 -322 575 -332 544Q-350 458 -313 417Z"}
+};
+
+const traces = {
+  awards:{path:"M787 -46C862 -43 917 40 905 101Q895 127 873 145",color:"#9a6747",refs:["j1","j2","v0"],label:"国内には作品・脚本・技術、米国では視覚効果",sourceIndex:9,reason:"日米の賞を並べ、何に対して賞が与えられたかを見比べる。"},
+  subtitled:{path:"M-285 -43Q-291 -26 -282 -11 M-276 3Q-282 22 -273 35",color:"#3c6460",refs:["a0","a1","a2"],label:"自社配給のそばに字幕と劇場手配",sourceIndex:11,reason:"字幕版を作り、現地で上映を手配する仕事があって、北米の劇場に作品が届いた。"},
+  releaseBridge:{path:"M-55 -60C58 -51 50 48 84 114",color:"#3c6460",refs:["a0","m0"],label:"米国での劇場公開を東宝側が担う",sourceIndex:12,reason:"米国公開日を、誰がその公開を届けたのかという仕事に結びつけた。"},
+  rights:{path:"M-305 -50C-318 4 -326 62 -302 110 M-287 134Q-287 161 -277 177",color:"#3c6460",arrow:true,refs:["a0","a3","a4"],label:"北米配給から、配信契約へ",sourceIndex:12,reason:"北米で自社配給したため二次利用権を保持したと東宝は説明。契約は北米に限らず日本を除く各地域を対象にした。"},
+  nextteam:{path:"M-310 96C-352 219 -350 375 -304 481 M-274 557Q-274 578 -269 587 M-256 609Q-239 635 -232 654",color:"#4a676b",dash:"3 6",refs:["a0","b0","b1","b2","b3"],label:"前作の配給を経験した人が、次の受け皿へ",sourceIndex:13,reason:"東宝の説明では、前作の北米配給を進める時期にGKIDS買収を検討。買収後は主導部署を移し、人員の移管方針も示した。『国宝』はGKIDSが担当した別の実写作例。"},
+  technique:{path:"M1114 546Q1198 544 1196 440M1228 300Q1226 322 1234 336M1245 357Q1238 383 1243 407",color:"#985340",refs:["w2","s0","s1","s2"],label:"大きさをどう画面に置いたか",sourceIndex:15,reason:"カメラ角度の話から、海面や壊れる街の具体へ移る。視覚効果を、賞の名前から実際の制作の仕事へ戻して見る線。"}
+  ,
+  market:{path:"M101 140Q104 158 134 166 M151 181Q152 194 160 198",color:"#315975",refs:["m0","m1","m2"],label:"劇場に届いた跡",reason:"米国公開、北米での白黒版上映、北米興収はそれぞれ上映の経路、形、規模を示している。"},
+  practice:{path:"M818 464Q823 481 850 492 M862 508Q875 523 885 533",color:"#8d3c35",refs:["w0","w1","w2","s0","s1","s2"],label:"フロアから画づくりへ",reason:"同じ場所での話しやすさを語る当事者が、修正やカメラ角度の提案も具体的に説明している。"},
+  scars:{path:"M75 480Q75 497 88 505 M96 522Q103 546 123 551",color:"#554e71",refs:["h0","h1","h2"],label:"生き残ったあとを読む",reason:"二つの批評を並べると、怪獣の恐ろしさと並んで、戦後の暮らしに戻ろうとする人が見えてくる。"},
+  before:{path:"M335 162C469 105 620 110 744 159",color:"#315975",refs:["m1","v0"],label:"白黒版は受賞前",note:[515,112,"白黒版１月、受賞３月"],reason:"北米白黒版は2024年1月、第96回アカデミー賞は同年3月。受賞は、すでに届き始めていた作品に加わった別の出来事。"},
+  credit:{path:"M1015 172C1123 226 1101 300 1085 350C1070 400 1010 423 969 441",color:"#8d3c35",refs:["v0","v1","w0"],label:"受賞から制作の現場へ",reason:"受賞した人を起点にインタビューを読むと、作品の評価から、同じフロアにいた人の仕事に戻れる。"},
+  time:{path:"M81 127C-9 164 21 339 17 498C10 618 41 670 145 693C250 718 309 687 329 657",color:"#315975",dash:"4 7",refs:["m0","n2"],label:"約４週間と、３日",sourceIndex:8,note:[227,724,"約４週間 ／ ３日"],reason:"前作は日本公開から米国公開まで約４週間、続編は日本公開から北米広域公開まで３日。公開間隔の比較。東宝の担当者は前作の海外ヒットを機会と捉え、続編では企画段階から海外公開を決めたと語る。"},
+  evidence:{path:"M566 653Q580 650 590 645",color:"#256254",refs:["n2","publish"],label:"３日は同時期公開の一例",sourceIndex:8,reason:"日本公開から３日後の北米公開は、東宝が取り組んだ世界同時期公開の一例。"},
+  support:{path:"M657 665H703 M680 665V687 M680 687C631 688 562 697 525 723 M680 687C726 688 821 697 873 723 M499 723H551 M847 723H899",color:"#256254",refs:["publish","n3","schedule"],label:"世界同時期公開を支えた仕事",sourceIndex:8,reason:"続編では企画の時点で海外展開を決め、海外担当者の助言を得ながら撮影日程を組んだ。丸めた括弧で、その公開を下から支えた二つの仕事を示す。"},
+  story:{path:"M315 551Q398 524 484 549",color:"#554e71",dash:"3 5",refs:["h1","h2","n0"],label:"評された人の物語が、次へ",sourceIndex:8,reason:"批評家が目を向けた戦後の暮らし。その物語を担った敷島たちが続編にも戻る。東宝のプロデューサーは、前作の戦後日本という舞台が海外で作品の個性になったと振り返り、続編の予告編でも日本らしさを意識したと語る。"}
+};
+
+const events = [
+  {topic:0},{point:"m0"},{point:"m1"},{point:"m2"},{trace:"market"},
+  {topic:1},{point:"v0"},{point:"v1"},{point:"j0"},{point:"j1"},{point:"j2"},{trace:"awards"},
+  {topic:2},{point:"w0"},{point:"w1"},{point:"w2"},{point:"s0"},{point:"s1"},{point:"s2"},{trace:"technique"},{trace:"practice"},{trace:"credit"},
+  {topic:3},{point:"h0"},{point:"h1"},{point:"h2"},{trace:"scars"},
+  {topic:4},{point:"n0"},{point:"n1"},{point:"n2"},{point:"n3"},{point:"schedule"},{point:"n4"},
+  {topic:5},{point:"a0"},{point:"a1"},{point:"a2"},{trace:"subtitled"},
+  {point:"a3"},{point:"a4"},{trace:"rights"},
+  {point:"b0"},{point:"b1"},{point:"b2"},{point:"b3"},
+  {caption:"図の上で読み返す",reason:"北米での上映日と受賞日、前作と続編の日米公開日、批評が見た人物と続編の登場人物、前作の自社配給とGKIDSの役割を行き来する。"},
+  {trace:"before"},{trace:"time"},{trace:"story"},{trace:"releaseBridge"},{trace:"nextteam"},
+  {point:"publish"},{trace:"evidence"},{trace:"support"},
+  {caption:"まとまって見えたところを囲む",reason:"問いを残したまま、関わりが見えた点の近くに群れの名前を書く。",names:true}
+];
+
+const svg = document.querySelector("#map");
+const detail = document.querySelector("#detail");
+const range = document.querySelector("#progress");
+const count = document.querySelector("#count");
+const NS = "http://www.w3.org/2000/svg";
+let selection = null;
+let step = events.length;
+range.max = String(events.length);
+
+function shape(parent, tag, attributes={}, content="") {
+  const el = document.createElementNS(NS, tag);
+  for (const [name,value] of Object.entries(attributes)) el.setAttribute(name, value);
+  if (content) el.textContent = content;
+  parent.append(el);
+  return el;
+}
+
+function selectable(element, label, item) {
+  element.setAttribute("tabindex","0");
+  element.setAttribute("role","button");
+  element.setAttribute("aria-label", label);
+  function choose() {
+    selection = selection?.id === item.id ? null : item;
+    render();
+    svg.querySelector('[data-id="' + item.id + '"]')?.focus({preventScroll:true});
+  }
+  element.dataset.id = item.id;
+  element.addEventListener("click", choose);
+  element.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      choose();
+    }
+  });
+}
+
+function labelInfo(label, reason, extra="", sourceIndex) {
+  detail.replaceChildren();
+  const heading = document.createElement("strong");
+  heading.textContent = label;
+  detail.append(heading, document.createTextNode(reason));
+  if (extra) {
+    const small = document.createElement("small");
+    small.textContent = extra;
+    detail.append(small);
+    if (sourceIndex !== undefined) {
+      const [publisher,,url] = source_text.sources[sourceIndex];
+      const link = document.createElement("a");
+      link.href = url;
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.textContent = publisher+"の原文 ↗";
+      detail.append(link);
+    }
+  }
+}
+
+function render() {
+  svg.replaceChildren();
+  range.value = String(step);
+  count.value = step + " / " + events.length;
+  document.querySelector("#back").disabled = step === 0;
+  document.querySelector("#next").disabled = step === events.length;
+  const seen = events.slice(0, step);
+  const names = seen.some(event => event.names);
+  const existing = new Set(seen.map(event => event.point).filter(Boolean));
+  const marker = shape(shape(svg,"defs"),"marker",{id:"arrow",viewBox:"0 0 10 10",refX:9,refY:5,markerWidth:6,markerHeight:6,orient:"auto"});
+  shape(marker,"path",{d:"M1 1L9 5 1 9",fill:"none",stroke:"context-stroke","stroke-width":1.4});
+  const areaLayer = shape(svg,"g",{"aria-hidden":"true"});
+  if (names) {
+    for (const [id] of groups) {
+      const field = fields[id];
+      const active = selection?.id === id;
+      shape(areaLayer,"path",{d:field.path,fill:field.color,"fill-opacity":active ? .17 : .062,stroke:field.color,"stroke-opacity":active ? .77 : .37,"stroke-width":active?2.15:1.05});
+    }
+  }
+
+  shape(svg,"ellipse",{cx:600,cy:369,rx:128,ry:62,fill:"#fbf7eb",stroke:"#17313c","stroke-width":1.7});
+  shape(svg,"text",{x:600,y:360,fill:"#17313c","font-size":35,"font-weight":700,"text-anchor":"middle"},"ゴジラ-1.0");
+  shape(svg,"text",{x:600,y:398,fill:"#17313c","font-size":25,"font-weight":700,"text-anchor":"middle"},"が与えた影響");
+
+  for (const event of seen.filter(event => event.topic !== undefined)) {
+    const topic = topics[event.topic];
+    const group = shape(svg,"g",{class:"point question"});
+    shape(group,"path",{d:topic.spoke,fill:"none",stroke:"#46555a","stroke-width":1.3,"stroke-linecap":"round","aria-hidden":"true",class:"question-link"});
+    if (event.topic === 4 ? existing.has("publish") : topic.refs.some(id => existing.has(id))) {
+      shape(group,"path",{d:topic.path,fill:"none",stroke:topic.ink,"stroke-width":1.25,"stroke-opacity":.6});
+    }
+    shape(group,"circle",{cx:topic.x,cy:topic.y-5,r:12,fill:topic.ink,"fill-opacity":0});
+    shape(group,"path",{d:"M"+topic.x+" "+(topic.y-10)+"l5 5-5 5-5-5Z",fill:"#fbf7eb",stroke:topic.ink,"stroke-width":1.55});
+    shape(group,"text",{x:topic.x+12,y:topic.y,fill:topic.ink,"font-size":17,"font-weight":700},topic.title);
+    const refs = topic.refs.filter(id => existing.has(id));
+    selectable(group,topic.title,{id:"topic"+event.topic,label:topic.title,reason:refs.length?"この問いから拾った点が浮かびます。":"この問いで気になった点を、次の手から置いていきます。",refs});
+  }
+
+  for (const event of seen.filter(event => event.trace)) {
+    const id = event.trace;
+    const mark = traces[id];
+    const group = shape(svg,"g",{class:"trace"});
+    shape(group,"path",{d:mark.path,fill:"none",stroke:mark.color,"stroke-opacity":0,"stroke-width":15,"pointer-events":"stroke"});
+    const attrs = {d:mark.path,fill:"none",stroke:mark.color,"stroke-width":1.7,"stroke-opacity":.65,"stroke-linecap":"round",class:"ink"};
+    if (mark.dash) attrs["stroke-dasharray"] = mark.dash;
+    if (mark.arrow) attrs["marker-end"] = "url(#arrow)";
+    shape(group,"path",attrs);
+    if (mark.note) {
+      const [x,y,wording] = mark.note;
+      shape(group,"text",{x,y,fill:mark.color,"font-size":15,"text-anchor":"middle"},wording);
+    }
+    const linkedPoints = mark.refs.map(ref => points.find(point => point[0] === ref)[3]);
+    selectable(group,mark.label || linkedPoints.join("、")+" のつながり",{id,refs:mark.refs,label:mark.label || "この形で見えたこと",reason:mark.reason,extra:(events.indexOf(event)+1)+"手目",sourceIndex:mark.sourceIndex});
+  }
+
+  for (const [id,x,y,label,color,reason,section,size=16] of points) {
+    if (!existing.has(id)) continue;
+    const muted = selection?.refs && !selection.refs.includes(id);
+    const group = shape(svg,"g",{class:"point"+(muted?" ghost":"")+(selection?.id===id?" active":"")});
+    shape(group,"circle",{cx:x,cy:y,r:14,fill:color,"fill-opacity":0});
+    shape(group,"circle",{cx:x,cy:y,r:size>23?13:8,fill:"none",stroke:color,"stroke-width":1,opacity:0,class:"ring"});
+    const slant = {m1:-3,v0:-2,h2:2,n2:-4}[id] || 0;
+    if (id === "publish") {
+      shape(group,"rect",{x:x-90,y:y-23,width:180,height:45,rx:5,fill:"#f7f8ee",stroke:color,"stroke-width":1.6});
+      shape(group,"text",{x,y:y+8,fill:color,"text-anchor":"middle","font-size":size,"font-weight":700},label);
+    } else {
+      shape(group,"circle",{cx:x,cy:y,r:size>23?4:2.8,fill:color});
+      shape(group,"text",{x:x+10,y:y+5,fill:size>=22?color:"#1d3038","font-size":size,"font-weight":size>=20?700:500,transform:"rotate("+slant+" "+x+" "+y+")"},label);
+    }
+    selectable(group,label,{id,label,reason,extra:source_text.sources[section][1]+"　•　"+(events.findIndex(event=>event.point===id)+1)+"手目",sourceIndex:section});
+  }
+
+  if (names) for (const [id,x,y,name,refs,reason,anchor="start"] of groups) {
+    const group = shape(svg,"g",{class:"island-label"});
+    const angle = {a:-4,b:-2,c:1,d:-2,e:-3,f:2,g:-2,h:-3}[id];
+    shape(group,"text",{x,y,fill:fields[id].color,"font-size":["e","f"].includes(id)?18:21,"font-weight":700,"text-anchor":anchor,transform:"rotate("+angle+" "+x+" "+y+")"},name);
+    selectable(group,name,{id,label:name,reason,refs});
+  }
+  if (selection) {
+    labelInfo(selection.label,selection.reason,selection.extra,selection.sourceIndex);
+    return;
+  }
+  if (step === events.length) {
+    labelInfo("点・群れの名・つながりを選ぶ", "ひし形の点は調査中に置いた問い。選ぶと、そこから浮かんだ点が見えます。", "「最初から」で、点や形が現れた順を見られます。");
+    return;
+  }
+  if (step === 0) {
+    labelInfo("描き始め", "「›」で、一つずつ図に置いていきます。");
+    return;
+  }
+  const event = events[step-1];
+  if (event.point) {
+    const point = points.find(point => point[0] === event.point);
+    labelInfo(point[3],point[5],source_text.sources[point[6]][1],point[6]);
+  } else if (event.topic !== undefined) {
+    const topic = topics[event.topic];
+    labelInfo(topic.title,"この問いで、気になったところを次の手から置きます。");
+  } else if (event.trace) {
+    const trace = traces[event.trace];
+    labelInfo(trace.label || "形を置く",trace.reason);
+  } else {
+    labelInfo(event.caption,event.reason);
+  }
+}
+
+function goTo(value) {
+  step = Math.max(0,Math.min(events.length,value));
+  selection = null;
+  render();
+}
+document.querySelector("#start").onclick = () => goTo(0);
+document.querySelector("#back").onclick = () => goTo(step-1);
+document.querySelector("#next").onclick = () => goTo(step+1);
+document.querySelector("#all").onclick = () => goTo(events.length);
+range.oninput = () => goTo(Number(range.value));
+const sourceList = document.querySelector("#dialogue");
+for (const [publisher,title,url] of source_text.sources) {
+  const item = document.createElement("li");
+  const link = document.createElement("a");
+  link.href = url;
+  link.target = "_blank";
+  link.rel = "noopener";
+  link.textContent = publisher+" · "+title;
+  item.append(link);
+  sourceList.append(item);
+}
+render();
+</script>
+</html>
