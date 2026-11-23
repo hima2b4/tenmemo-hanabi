@@ -11,13 +11,14 @@
 
 ## このキットに入っているもの
 
-- **実行プロンプト** [`tenmemo-hanabi-v0.2.md`](tenmemo-hanabi-v0.2.md)
+- **実行プロンプト** [`tenmemo-hanabi-v0.2.1.md`](tenmemo-hanabi-v0.2.1.md)（現行。旧版 v0.2 も残してあります）
   テーマと素材と一緒に、AI（ChatGPT、Claude、Gemini など）に渡して使います。
   描き方だけでなく、図を「育てる」ための見直し、記録、引き継ぎの作法までを含みます。
+  v0.2.1 では「図の形」の骨格を文章で足し、正本の図を指定しました。
 - **実例の図**（`examples/` フォルダ、GitHub Pages でそのまま開けます）
   - [点メモ（KJ法の点メモについての記事から）](https://hima2b4.github.io/tenmemo-hanabi/examples/tenmemo-hanabi.html)
   - [部品ピッキング間違い](https://hima2b4.github.io/tenmemo-hanabi/examples/tenmemo-picking.html)
-  - [『ゴジラ-1.0』が与えた影響](https://hima2b4.github.io/tenmemo-hanabi/examples/tenmemo-godzilla.html)
+  - [『ゴジラ-1.0』が与えた影響](https://hima2b4.github.io/tenmemo-hanabi/examples/tenmemo-godzilla.html)（**正本**。形はまずこの図で骨格をつかんでください）
   - [夏目漱石『こころ』](https://hima2b4.github.io/tenmemo-hanabi/examples/tenmemo-kokoro.html)
   - [「パーソナルAIエージェント」の魅力と来年の展望](https://hima2b4.github.io/tenmemo-hanabi/examples/personal-ai-agent.html)
 
@@ -26,7 +27,7 @@
 
 ## 使い方
 
-1. `tenmemo-hanabi-v0.2.md` の「実行用プロンプト」を、テーマと素材とともにAIに渡す。
+1. `tenmemo-hanabi-v0.2.1.md` の「実行用プロンプト」を、テーマと素材とともにAIに渡す。
 2. できあがった図を眺め直し、気になるところがあれば対話しながら点を足したり、線を見直したりする。
 3. 続きを描くときは、前の図と短い記録を添えて渡す（引き継ぎの形はプロンプトの中にあります）。
 
